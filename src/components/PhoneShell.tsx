@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { ShieldCheck, Sparkles, Lock } from "lucide-react";
 import { BottomNav } from "./BottomNav";
+import { cn } from "@/lib/utils";
 
 interface Props {
   children: ReactNode;
@@ -12,8 +13,15 @@ export const PhoneShell = ({ children, hideNav }: Props) => {
     <div className="min-h-screen w-full bg-gradient-mesh bg-background">
       {/* Mobile: full-bleed app */}
       <div className="lg:hidden flex justify-center">
-        <div className="w-full max-w-[440px] min-h-screen bg-background relative overflow-hidden">
-          <div className="pb-28 min-h-screen">{children}</div>
+        <div className="w-full max-w-[440px] min-h-screen bg-background relative overflow-hidden flex flex-col">
+          {/* Main content area - dynamic padding based on navigation visibility */}
+          <div className={cn(
+            "flex-1 flex flex-col min-h-screen",
+            !hideNav && "pb-28"
+          )}>
+            {children}
+          </div>
+          
           {!hideNav && (
             <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] z-50 px-4 pb-4 pt-2 pointer-events-none">
               <BottomNav />
@@ -39,12 +47,17 @@ const PhoneFrame = ({ children, hideNav }: { children: ReactNode; hideNav?: bool
     <div className="absolute -inset-8 bg-gradient-shield opacity-20 blur-3xl rounded-[60px] -z-10" />
     {/* Bezel */}
     <div className="w-[400px] h-[820px] bg-foreground rounded-[52px] p-3 shadow-elevated">
-      <div className="relative w-full h-full bg-background rounded-[42px] overflow-hidden">
+      <div className="relative w-full h-full bg-background rounded-[42px] overflow-hidden flex flex-col">
         {/* Notch */}
         <div className="absolute top-2 left-1/2 -translate-x-1/2 w-28 h-6 bg-foreground rounded-full z-50" />
-        <div className="w-full h-full overflow-y-auto no-scrollbar pb-28">
+        
+        <div className={cn(
+          "flex-1 flex flex-col overflow-y-auto no-scrollbar",
+          !hideNav && "pb-28"
+        )}>
           {children}
         </div>
+        
         {!hideNav && (
           <nav className="absolute bottom-0 left-0 right-0 z-40 px-4 pb-4 pt-2 pointer-events-none">
             <BottomNav />

@@ -40,7 +40,7 @@ const OnboardingBank = () => {
       
       toast.success(`${bankName} linked successfully!`);
       setIsLinking(null);
-      navigate("/home");
+      navigate("/onboarding/pin");
     }, 2000);
   };
 

@@ -1,15 +1,18 @@
 import { Contact } from "@/data/mockData";
 import { PREDICT_ENDPOINT } from "@/config";
 
-export const generateFeatures = (contact: Contact, amount: number): number[] => {
+export const generateFeatures = (contact: Contact, amount: number, gps?: { lat: number, lon: number }): number[] => {
   const isRisky = contact.trust === "risky";
   const isNew = contact.trust === "new";
   const hour = new Date().getHours();
 
-  // Raw base values (simulated)
+  // Real GPS Analysis
+  const hasGps = gps && gps.lat !== 0;
+  // If GPS is far from "home" (simulated), mark anomaly
+  const locationMismatch = isRisky || (hasGps && Math.abs(gps.lat - 19.0760) > 0.5) ? 1 : 0; 
+
   const recipientBlacklisted = isRisky ? 1 : 0;
   const amountAnomaly = isRisky ? 0.8 : 0.1;
-  const locationMismatch = isRisky && Math.random() > 0.7 ? 1 : 0;
   const vpnDetected = isRisky && Math.random() > 0.5 ? 1 : 0;
   const deviceTrust = isRisky ? 0.3 : 0.95;
   const behavioralAnomaly = isRisky ? 0.7 : 0.15;
@@ -46,7 +49,7 @@ export const generateFeatures = (contact: Contact, amount: number): number[] => 
   return f; // Array of exactly 22 numeric values
 };
 
-export const checkFraud = async (features: number[], upiId: string, amount: number) => {
+export const checkFraud = async (features: number[], upiId: string, amount: number, id?: string) => {
   try {
     const response = await fetch(PREDICT_ENDPOINT, {
       method: "POST",
@@ -55,23 +58,35 @@ export const checkFraud = async (features: number[], upiId: string, amount: numb
         features,
         upiId,
         amount,
-        id: `txn_${Date.now()}`
+        id: id || `txn_${Date.now()}`
       }),
     });
 
     if (!response.ok) throw new Error("Server error");
 
     const data = await response.json();
-    
-    // Accepts "prediction", "predictions", or "result" per dashboard spec
     const prediction = data.prediction ?? data.predictions ?? data.result;
     
     return {
       isFraud: prediction === 1,
       score: prediction === 1 ? 95 : 10,
+      mode: 'live' as const
     };
   } catch (error) {
-    console.error(`CRITICAL: Fraud Engine unreachable at ${PREDICT_ENDPOINT}`);
-    throw error;
+    console.warn(`Sentinel AI Server unreachable. Switching to Local Intelligence.`);
+    
+    // SMART FALLBACK: Simulate fraud based on the 'risky' trust score from features
+    // Feature index 0 is 'recipientBlacklisted'
+    const isRisky = features[0] === 1;
+    const isHighAmount = amount > 10000;
+    
+    // Higher probability of fraud if risky or high amount in fallback mode
+    const isSimulatedFraud = isRisky || (isHighAmount && Math.random() > 0.7);
+
+    return {
+      isFraud: isSimulatedFraud,
+      score: isSimulatedFraud ? 88 : 12,
+      mode: 'simulated' as const
+    };
   }
 };

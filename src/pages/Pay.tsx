@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ShieldCheck, Loader2, ShieldAlert, BadgeCheck, Ban, MessageSquare } from "lucide-react";
 import { PhoneShell } from "@/components/PhoneShell";
@@ -39,18 +39,59 @@ const Pay = () => {
   const [pinMode, setPinMode] = useState<"pay" | "balance">("pay");
   const [showFraudAlert, setShowFraudAlert] = useState(false);
   const [showLimitAlert, setShowLimitAlert] = useState(false);
-  const [fraudScore, setFraudScore] = useState(0);
+  const [liveRiskScore, setLiveRiskScore] = useState(0);
   const [showBanks, setShowBanks] = useState(false);
   const [selectedBank, setSelectedBank] = useState(0);
   const [viewingBalance, setViewingBalance] = useState<number | null>(null);
+  const [fraudMode, setFraudMode] = useState<"live" | "simulated">("live");
 
   const banks = USER_BANKS;
+
+  const transactionId = useRef(`txn_${Math.random().toString(36).substr(2, 9)}`);
+  const numericAmount = useMemo(() => parseFloat(amount || "0"), [amount]);
+
+  useEffect(() => {
+    if (!contact || numericAmount <= 0) {
+      setLiveRiskScore(0);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      if (numericAmount <= 0) return;
+      
+      let lat = 0, lon = 0;
+      try {
+        const pos = await new Promise<GeolocationPosition>((res, rej) => {
+          navigator.geolocation.getCurrentPosition(res, rej, { timeout: 3000 });
+        });
+        lat = pos.coords.latitude;
+        lon = pos.coords.longitude;
+      } catch (e) {
+        console.warn("GPS Access Denied/Timed out. Using fallback.");
+      }
+
+      try {
+        const result = await checkFraud(
+          generateFeatures(contact, numericAmount, { lat, lon }), 
+          contact.upi, 
+          numericAmount,
+          transactionId.current
+        );
+        const base = contact.trust === 'risky' ? 65 : 10;
+        setLiveRiskScore(Math.max(base, result.score));
+        setFraudMode(result.mode);
+      } catch (err) {
+        setLiveRiskScore(numericAmount > 1000 ? 45 : 12);
+        setFraudMode("simulated");
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [numericAmount, contact]);
 
   useEffect(() => {
     if (!contact) navigate("/send", { replace: true });
   }, [contact, navigate]);
-
-  const numericAmount = useMemo(() => parseFloat(amount || "0"), [amount]);
 
   if (!contact) return null;
 
@@ -73,13 +114,29 @@ const Pay = () => {
     setChecking(true);
     setPinMode("pay");
     
+    let lat = 0, lon = 0;
     try {
-      const result = await checkFraud(generateFeatures(contact, numericAmount), contact.upi, numericAmount);
+      const pos = await new Promise<GeolocationPosition>((res, rej) => {
+        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 3000 });
+      });
+      lat = pos.coords.latitude;
+      lon = pos.coords.longitude;
+    } catch (e) {
+      console.warn("GPS Access Denied/Timed out.");
+    }
+
+    try {
+      const result = await checkFraud(
+        generateFeatures(contact, numericAmount, { lat, lon }), 
+        contact.upi, 
+        numericAmount, 
+        transactionId.current
+      );
+      setFraudMode(result.mode);
       const isDatabaseRisky = contact.isRisky || contact.name.toLowerCase().includes("amazon");
       setChecking(false);
       
       if (result.isFraud || isDatabaseRisky) {
-        setFraudScore(isDatabaseRisky ? 92 : result.score);
         setShowFraudAlert(true);
       } else {
         setIsVerified(true);
@@ -96,11 +153,6 @@ const Pay = () => {
     }
   };
 
-  const onBiometricSuccess = () => {
-    setShowBiometric(false);
-    setShowPinPad(true);
-  };
-
   const onPinSuccess = () => {
     setShowPinPad(false);
     if (pinMode === "balance") {
@@ -114,7 +166,7 @@ const Pay = () => {
         shielded: true
       });
       updateBalance(numericAmount, "debit");
-      navigate("/success", { state: { contact, amount: numericAmount, score: fraudScore } });
+      navigate("/success", { state: { contact, amount: numericAmount, score: liveRiskScore } });
     }
   };
 
@@ -127,15 +179,9 @@ const Pay = () => {
         amount: numericAmount, 
         note, 
         scenario, 
-        score: Math.max(fraudScore, 70) 
+        score: Math.max(liveRiskScore, 70) 
       } 
     });
-  };
-
-  const handleCheckBalance = (index: number) => {
-    setPinMode("balance");
-    setSelectedBank(index);
-    setShowPinPad(true);
   };
 
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"];
@@ -145,7 +191,7 @@ const Pay = () => {
     <PhoneShell hideNav>
       <div className="flex flex-col h-full bg-background overflow-hidden select-none">
         {/* Fixed Header */}
-        <header className="shrink-0 px-5 pt-10 pb-4 flex items-center gap-4 z-[40]">
+        <header className="shrink-0 px-5 pt-8 pb-2 flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-all shadow-sm"
@@ -161,12 +207,12 @@ const Pay = () => {
           </div>
         </header>
 
-        {/* Fixed Content - Absolutely No Scrolling */}
-        <div className="flex-1 flex flex-col justify-between pt-2 pb-36">
-          <div className="px-5 text-center animate-slide-up">
-            <p className="text-[10px] text-muted-foreground/60 font-medium mb-6 tabular-nums uppercase tracking-widest">{contact.upi}</p>
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col pt-4 overflow-hidden">
+          <div className="px-5 text-center animate-slide-up shrink-0">
+            <p className="text-[10px] text-muted-foreground/60 font-medium mb-3 tabular-nums uppercase tracking-widest">{contact.upi}</p>
             
-            <div className="flex items-start justify-center gap-1.5 mb-6">
+            <div className="flex items-start justify-center gap-1.5 mb-4">
               <span className="font-display text-4xl font-bold text-muted-foreground mt-2">₹</span>
               <span className={cn(
                 "font-display text-6xl font-bold tabular-nums tracking-tighter transition-all duration-300",
@@ -176,7 +222,7 @@ const Pay = () => {
               </span>
             </div>
             
-            <div className="relative w-full max-w-[280px] mx-auto group mb-4">
+            <div className="relative w-full max-w-[240px] mx-auto group mb-4">
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
                 <MessageSquare className="w-4 h-4" />
               </div>
@@ -184,14 +230,41 @@ const Pay = () => {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="What's this for?"
-                className="w-full bg-secondary/40 border border-transparent rounded-2xl py-3.5 pl-11 pr-4 text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-background focus:border-primary/30 transition-all shadow-inner"
+                className="w-full bg-secondary/30 border border-transparent rounded-xl py-2.5 pl-10 pr-4 text-xs text-left focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-background focus:border-primary/30 transition-all shadow-inner"
               />
+            </div>
+
+            {/* Live Risk Meter */}
+            <div className="px-10 mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center px-1">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className={cn("w-3.5 h-3.5", liveRiskScore > 30 ? "text-amber-500" : "text-primary")} />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sentinel Risk Analysis</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", fraudMode === 'live' ? "bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]" : "bg-blue-500")} />
+                    <span className="text-[9px] font-bold uppercase tracking-tighter text-muted-foreground/80">
+                      {fraudMode === 'live' ? "Cloud AI Live" : "Local Secure Mode"}
+                    </span>
+                  </div>
+                </div>
+                <div className="h-2 w-full bg-zinc-200 rounded-full overflow-hidden border border-zinc-300/50 shadow-inner">
+                  <div 
+                    className={cn(
+                      "h-full transition-all duration-300 ease-out border-r border-white/20",
+                      liveRiskScore > 70 ? "bg-destructive" : liveRiskScore > 30 ? "bg-yellow-500" : "bg-primary"
+                    )}
+                    style={{ width: `${liveRiskScore}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="px-5">
+          <div className="px-5 flex-1 flex flex-col justify-center">
             {!showBanks ? (
-              <div className="px-5 grid grid-cols-3 gap-x-8 gap-y-2 animate-in fade-in zoom-in-95 duration-300">
+              <div className="px-4 grid grid-cols-3 gap-x-6 gap-y-1">
                 {keys.map((k) => (
                   <button 
                     key={k} 
@@ -236,10 +309,10 @@ const Pay = () => {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Action Button */}
         <div className={cn(
-          "fixed bottom-0 left-0 right-0 px-5 pb-8 bg-gradient-to-t from-background via-background/95 to-transparent pt-12 z-[100] transition-all duration-500",
-          shouldHideButton ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100 pointer-events-auto"
+          "shrink-0 px-5 pb-8 pt-4 transition-all duration-500",
+          shouldHideButton ? "opacity-0 pointer-events-none translate-y-10" : "opacity-100 translate-y-0"
         )}>
           <div className="max-w-[400px] mx-auto">
             <div className="flex items-center gap-2 justify-center text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-4 opacity-50">
@@ -266,55 +339,58 @@ const Pay = () => {
             </button>
           </div>
         </div>
+
+        <UpiPinPad isOpen={showPinPad} onClose={() => setShowPinPad(false)} onSuccess={onPinSuccess} payeeName={contact.name} amount={numericAmount} />
+
+        <AlertDialog open={showLimitAlert} onOpenChange={setShowLimitAlert}>
+          <AlertDialogContent className="rounded-[40px] max-w-[90%] w-[360px] p-8 bg-zinc-900 border border-white/10 shadow-2xl animate-in zoom-in-95 duration-300">
+            <AlertDialogHeader>
+              <div className="mx-auto w-16 h-16 rounded-3xl bg-amber-500/20 flex items-center justify-center mb-4 border border-amber-500/30">
+                <Ban className="w-8 h-8 text-amber-500" />
+              </div>
+              <AlertDialogTitle className="text-center font-display text-2xl font-bold text-white">Limit Exceeded</AlertDialogTitle>
+              <AlertDialogDescription className="text-center text-zinc-400 text-base leading-relaxed">
+                Daily quota reached.
+                <br/><br/>
+                Remaining: <span className="text-amber-500 font-bold">₹{Math.max(getDailyLimit() - getTodaySpent(), 0).toLocaleString("en-IN")}</span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-6">
+              <AlertDialogAction onClick={() => setShowLimitAlert(false)} className="bg-white text-black rounded-2xl py-7 text-lg font-bold w-full hover:bg-zinc-200 transition-colors">
+                Got it
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={showFraudAlert} onOpenChange={setShowFraudAlert}>
+          <AlertDialogContent className="rounded-[40px] max-w-[90%] w-[360px] p-8 bg-zinc-900 border border-white/10 shadow-2xl animate-in zoom-in-95 duration-300">
+            <AlertDialogHeader>
+              <div className="mx-auto w-16 h-16 rounded-3xl bg-destructive/20 flex items-center justify-center mb-4 border border-white/10">
+                <ShieldAlert className="w-8 h-8 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-center font-display text-2xl font-bold text-white">Fraud Alert!</AlertDialogTitle>
+              <AlertDialogDescription className="text-center text-zinc-400 text-base leading-relaxed">
+                Our AI Shield has flagged this transaction as <span className="text-destructive font-bold">High Risk</span>.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-3 mt-8">
+              <AlertDialogAction 
+                onClick={viewRiskDetails} 
+                className="bg-destructive text-white rounded-2xl py-7 text-lg font-bold shadow-lg shadow-destructive/25 hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                View Detailed Risk
+              </AlertDialogAction>
+              <AlertDialogCancel 
+                onClick={() => navigate("/home")} 
+                className="rounded-2xl py-7 text-lg font-bold bg-white/5 border border-white/10 text-white hover:bg-white/10 active:scale-[0.98] transition-all"
+              >
+                Cancel Securely
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-
-      {/* Overlays */}
-      <BiometricPrompt isOpen={showBiometric} onClose={() => setShowBiometric(false)} onSuccess={onBiometricSuccess} type={contact.trust === "trusted" ? "face" : "fingerprint"} />
-      <UpiPinPad isOpen={showPinPad} onClose={() => setShowPinPad(false)} onSuccess={onPinSuccess} payeeName={contact.name} amount={numericAmount} />
-
-      {/* Redesigned Premium Dark Dialogs */}
-      <AlertDialog open={showLimitAlert} onOpenChange={setShowLimitAlert}>
-        <AlertDialogContent className="rounded-[40px] max-w-[90%] w-[360px] p-8 bg-zinc-900 border border-white/10 shadow-2xl animate-in zoom-in-95 duration-300">
-          <AlertDialogHeader>
-            <div className="mx-auto w-16 h-16 rounded-3xl bg-amber-500/20 flex items-center justify-center mb-4 border border-amber-500/30">
-              <Ban className="w-8 h-8 text-amber-500" />
-            </div>
-            <AlertDialogTitle className="text-center font-display text-2xl font-bold text-white">Limit Exceeded</AlertDialogTitle>
-            <AlertDialogDescription className="text-center text-zinc-400 text-base leading-relaxed">
-              Daily quota of <b className="text-white">₹{getDailyLimit().toLocaleString("en-IN")}</b> reached.
-              <br/><br/>
-              Remaining: <span className="text-amber-500 font-bold">₹{Math.max(getDailyLimit() - getTodaySpent(), 0).toLocaleString("en-IN")}</span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogAction onClick={() => setShowLimitAlert(false)} className="bg-white text-black rounded-2xl py-7 text-lg font-bold w-full hover:bg-zinc-200 transition-colors">
-              Got it
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={showFraudAlert} onOpenChange={setShowFraudAlert}>
-        <AlertDialogContent className="rounded-[40px] max-w-[90%] w-[360px] p-8 bg-zinc-900 border border-white/10 shadow-2xl animate-in zoom-in-95 duration-300">
-          <AlertDialogHeader>
-            <div className="mx-auto w-16 h-16 rounded-3xl bg-destructive/20 flex items-center justify-center mb-4 border border-destructive/30">
-              <ShieldAlert className="w-8 h-8 text-destructive" />
-            </div>
-            <AlertDialogTitle className="text-center font-display text-2xl font-bold text-white">Fraud Alert!</AlertDialogTitle>
-            <AlertDialogDescription className="text-center text-zinc-400 text-base leading-relaxed">
-              Our AI Shield has flagged this transaction as <span className="text-destructive font-bold">High Risk</span>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-3 mt-6">
-            <AlertDialogAction onClick={viewRiskDetails} className="bg-destructive text-white rounded-2xl py-7 text-lg font-bold shadow-glow hover:brightness-110 transition-all">
-              View Detailed Risk
-            </AlertDialogAction>
-            <AlertDialogCancel onClick={() => navigate("/home")} className="rounded-2xl py-7 text-lg font-bold bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all">
-              Cancel Securely
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </PhoneShell>
   );
 };

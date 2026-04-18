@@ -181,6 +181,12 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
               <p className="px-4 text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-2">{t("App Settings")}</p>
               <div className="space-y-1">
                 <MenuItem 
+                  onClick={() => { onClose(); navigate("/settings"); }}
+                  icon={Settings} 
+                  label={t("General Settings")} 
+                  sub={t("Theme, Notifications & more")} 
+                />
+                <MenuItem 
                   onClick={() => setShowLanguagePicker(true)}
                   icon={Languages} 
                   label={t("App Language")} 

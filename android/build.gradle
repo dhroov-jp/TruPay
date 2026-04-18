@@ -22,6 +22,24 @@ allprojects {
         google()
         mavenCentral()
     }
+    
+    // Force all tasks to use the system Java instead of searching for a specific toolchain version
+    tasks.withType(JavaCompile).configureEach {
+        options.fork = true
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+    }
 }
 
 task clean(type: Delete) {

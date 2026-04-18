@@ -1,49 +1,46 @@
-import { browserLocalPersistence, onIdTokenChanged, setPersistence, signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "./firebase";
+import { signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "firebase/auth";
 
-const AUTH_TOKEN_STORAGE_KEY = "trupay_auth_token";
-
-let unsubscribeTokenListener: (() => void) | null = null;
-let persistenceReady = false;
-
-const storeAuthToken = (token: string) => {
-  localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
-};
-
-export const clearClientAuthState = () => {
-  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-};
-
+/**
+ * Initializes the auth session persistence and listeners.
+ */
 export const initializeAuthSession = async () => {
-  if (!auth) {
-    clearClientAuthState();
-    return;
-  }
-
-  if (!persistenceReady) {
-    await setPersistence(auth, browserLocalPersistence);
-    persistenceReady = true;
-  }
-
-  if (!unsubscribeTokenListener) {
-    unsubscribeTokenListener = onIdTokenChanged(auth, async (user) => {
-      if (!user) {
-        clearClientAuthState();
-        return;
-      }
-
-      const token = await user.getIdToken();
-      storeAuthToken(token);
-    });
+  try {
+    if (auth) {
+      // Ensure session persists across restarts
+      await setPersistence(auth, browserLocalPersistence);
+    }
+    return true;
+  } catch (error) {
+    console.warn("Auth Session Initialization Warning:", error);
+    return false;
   }
 };
 
+/**
+ * Performs a full sign-out by clearing both Firebase session 
+ * and local storage security markers (Name, PIN, etc.)
+ */
 export const signOutAndCleanup = async () => {
-  if (auth) {
-    await signOut(auth);
-  }
+  try {
+    // 1. Clear Firebase Auth
+    if (auth) {
+      await signOut(auth);
+    }
 
-  clearClientAuthState();
-  // We explicitly DO NOT clear trupay_bank_accounts or trupay_biometric_settings
-  // so that returning users have a seamless experience.
+    // 2. Clear Local Identity markers
+    localStorage.removeItem("trupay_user_name");
+    localStorage.removeItem("trupay_pin");
+    
+    // 3. Clear any session-specific UI states
+    sessionStorage.clear();
+
+    // 4. Wake up the auth guard to redirect to login
+    window.dispatchEvent(new Event("storage"));
+
+    return true;
+  } catch (error) {
+    console.error("Sign-out error:", error);
+    throw error;
+  }
 };

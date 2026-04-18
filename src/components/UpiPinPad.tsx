@@ -84,51 +84,51 @@ export const UpiPinPad: React.FC<UpiPinPadProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] bg-zinc-950 flex flex-col animate-in slide-in-from-bottom duration-500 overflow-hidden">
-      {/* Premium Dark Header */}
-      <div className="shrink-0 flex items-center justify-between p-5 border-b border-white/5 bg-zinc-950/50 backdrop-blur-xl">
+    <div className="fixed inset-0 z-[120] bg-white flex flex-col animate-in fade-in duration-500 overflow-hidden">
+      {/* Premium Light Header */}
+      <div className="shrink-0 flex items-center justify-between p-5 border-b border-zinc-100 bg-white/80 backdrop-blur-xl">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-[9px] shadow-lg shadow-blue-900/20">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-[9px] shadow-lg shadow-blue-600/20">
             NPCI
           </div>
           <div className="text-left">
-            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-white/40 leading-none mb-1">Secure Network</span>
-            <span className="block text-xs font-bold text-white tracking-wide leading-none">BHIM UPI Gateway</span>
+            <span className="block text-[8px] font-black uppercase tracking-[0.2em] text-zinc-400 leading-none mb-1">Secure Network</span>
+            <span className="block text-xs font-bold text-zinc-900 tracking-wide leading-none">BHIM UPI Gateway</span>
           </div>
         </div>
         <button 
           onClick={onClose}
-          className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center active:scale-90 transition-all hover:bg-white/10"
+          className="w-9 h-9 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center active:scale-90 transition-all"
         >
-          <X className="w-5 h-5 text-white/40" />
+          <X className="w-5 h-5 text-zinc-400" />
         </button>
       </div>
 
-      {/* Modern Status Section - Compacted */}
+      {/* Modern Status Section - White Theme */}
       <div className="shrink-0 px-6 pt-6 pb-2 flex flex-col items-center">
-        <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4 shadow-2xl">
+        <div className="w-12 h-12 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-4 shadow-sm">
           <Lock className="w-5 h-5 text-primary animate-pulse" />
         </div>
         
         <p className="text-[9px] font-black uppercase tracking-[0.3em] text-primary mb-2 leading-none">
           {isSetting ? "New Registration" : "Payment Authorization"}
         </p>
-        <h2 className="text-lg font-display font-black text-white text-center px-4 leading-tight">
+        <h2 className="text-lg font-display font-black text-zinc-900 text-center px-4 leading-tight">
           {isSetting ? "Set Secure 4-Digit PIN" : `Paying ${payeeName}`}
         </h2>
         
-        <div className="mt-4 px-6 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md shadow-inner">
-          <p className="text-2xl font-display font-black text-white tracking-tight tabular-nums">
+        <div className="mt-4 px-6 py-2 rounded-full bg-zinc-50 border border-zinc-100 shadow-inner">
+          <p className="text-2xl font-display font-black text-zinc-900 tracking-tight tabular-nums">
             ₹{amount.toLocaleString("en-IN")}
           </p>
         </div>
       </div>
 
-      {/* PIN Input Area - Balanced Spacing */}
+      {/* PIN Input Area - Light Mode */}
       <div className="flex-1 flex flex-col items-center justify-center px-8">
         <p className={cn(
           "text-[9px] font-black uppercase tracking-[0.4em] mb-8 transition-colors leading-none",
-          error ? "text-destructive" : "text-white/30"
+          error ? "text-destructive" : "text-zinc-400"
         )}>
           {isSetting 
             ? (isConfirming ? "Confirm PIN" : "Enter New PIN") 
@@ -145,8 +145,8 @@ export const UpiPinPad: React.FC<UpiPinPadProps> = ({
               className={cn(
                 "w-3.5 h-3.5 rounded-full border-2 transition-all duration-300",
                 i < pin.length 
-                  ? "bg-primary border-primary scale-125 shadow-[0_0_12px_rgba(59,130,246,0.5)]" 
-                  : cn("bg-transparent border-white/10", error && "border-destructive/40")
+                  ? "bg-primary border-primary scale-125 shadow-[0_0_12px_rgba(59,130,246,0.2)]" 
+                  : cn("bg-transparent border-zinc-200", error && "border-destructive/40")
               )}
             />
           ))}
@@ -158,33 +158,33 @@ export const UpiPinPad: React.FC<UpiPinPadProps> = ({
             Verification Failed
           </div>
         ) : (
-          <div className="mt-8 flex items-center gap-2.5 text-success font-black text-[8px] uppercase tracking-[0.3em] bg-success/10 px-4 py-2 rounded-full border border-success/20">
+          <div className="mt-8 flex items-center gap-2.5 text-success font-black text-[8px] uppercase tracking-[0.3em] bg-success/5 px-4 py-2 rounded-full border border-success/10">
             <ShieldCheck className="w-3.5 h-3.5" />
             AI Shield Vault Active
           </div>
         )}
       </div>
 
-      {/* Premium Numeric Keypad - Slimmer rows to fit all screens */}
-      <div className="shrink-0 grid grid-cols-3 bg-white/5 backdrop-blur-2xl border-t border-white/5 shadow-2xl">
+      {/* Premium Numeric Keypad - Light Mode */}
+      <div className="shrink-0 grid grid-cols-3 bg-zinc-50/50 backdrop-blur-2xl border-t border-zinc-100 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
           <button
             key={n}
             onClick={() => handlePress(n.toString())}
-            className="py-4 text-2xl font-display font-black text-white hover:bg-white/5 active:bg-white/10 transition-all border-r border-b border-white/5"
+            className="py-4 text-2xl font-display font-black text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 transition-all border-r border-b border-zinc-100"
           >
             {n}
           </button>
         ))}
         <button
           onClick={handleDelete}
-          className="py-4 flex items-center justify-center border-r border-white/5 hover:bg-white/5 active:bg-white/10 transition-all"
+          className="py-4 flex items-center justify-center border-r border-zinc-100 hover:bg-zinc-100 active:bg-zinc-200 transition-all"
         >
-          <Delete className="w-6 h-6 text-white/40" />
+          <Delete className="w-6 h-6 text-zinc-400" />
         </button>
         <button
           onClick={() => handlePress("0")}
-          className="py-4 text-2xl font-display font-black text-white border-r border-white/5 hover:bg-white/5 active:bg-white/10 transition-all"
+          className="py-4 text-2xl font-display font-black text-zinc-900 border-r border-zinc-100 hover:bg-zinc-100 active:bg-zinc-200 transition-all"
         >
           0
         </button>
@@ -194,15 +194,15 @@ export const UpiPinPad: React.FC<UpiPinPadProps> = ({
             "py-4 flex items-center justify-center transition-all duration-500",
             pin.length === pinLength 
               ? "bg-primary text-white shadow-glow" 
-              : "bg-white/5 text-white/10 pointer-events-none"
+              : "bg-zinc-100 text-zinc-300 pointer-events-none"
           )}
         >
           <Check className="w-8 h-8" strokeWidth={4} />
         </button>
       </div>
       
-      {/* Safe Area Padding - Minimal */}
-      <div className="h-6 bg-zinc-950" />
+      {/* Safe Area Padding */}
+      <div className="h-8 bg-white" />
     </div>
   );
 };

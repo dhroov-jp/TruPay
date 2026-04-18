@@ -12,13 +12,25 @@ export const getTransactions = (): Transaction[] => {
   return JSON.parse(saved);
 };
 
-export const addTransaction = (transaction: Omit<Transaction, "id" | "time">) => {
+export const addTransaction = (transaction: Omit<Transaction, "id" | "time" | "status"> & { status?: string }) => {
   const transactions = getTransactions();
+  const now = new Date();
+  
+  // Generate a realistic UPI Transaction ID
+  const txnId = Math.random().toString().slice(2, 14);
+  
   const newTransaction: Transaction = {
     ...transaction,
-    id: "tx-" + Date.now(),
-    time: "Today, " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: "success"
+    id: txnId,
+    time: now.toLocaleString('en-IN', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    }),
+    status: transaction.status || "Success"
   };
   
   const updated = [newTransaction, ...transactions];

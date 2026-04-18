@@ -13,7 +13,17 @@ const config: CapacitorConfig = {
       scopes: ["profile", "email"],
       serverClientId: "694530490769-3npf3c04g48j6lcfnqm2a8orb7kar1ss.apps.googleusercontent.com",
       forceCodeForRefreshToken: true
+    },
+    CapacitorHttp: {
+      enabled: true
     }
+  },
+  android: {
+    allowMixedContent: true
+  },
+  server: {
+    allowNavigation: ["10.10.37.139", "10.10.37.139:5000", "*"],
+    cleartext: true
   }
 };
 

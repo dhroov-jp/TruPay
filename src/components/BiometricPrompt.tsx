@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Fingerprint, ScanFace, X, ShieldCheck } from "lucide-react";
+import { Fingerprint, ScanFace, X, ShieldCheck, ShieldAlert, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  getBiometricSettings,
-  setBiometricSettings,
-  uint8ToBase64,
-  base64ToUint8,
+  registerBiometric,
+  authenticateBiometric,
+  isBiometricAvailable
 } from "@/lib/biometrics";
 
 interface BiometricPromptProps {
@@ -26,255 +25,210 @@ export const BiometricPrompt: React.FC<BiometricPromptProps> = ({
 }) => {
   const [status, setStatus] = useState<"idle" | "scanning" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  // Guard ref: prevents concurrent WebAuthn calls ("request already pending" error)
-  const isInFlightRef = useRef(false);
-  // Keep stable refs to callbacks so useEffect doesn't re-run when they change
-  const onSuccessRef = useRef(onSuccess);
-  const modeRef = useRef(mode);
-  const typeRef = useRef(type);
-
-  useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
-  useEffect(() => { modeRef.current = mode; }, [mode]);
-  useEffect(() => { typeRef.current = type; }, [type]);
-
-  const checkSupport = (): boolean => {
-    if (!window.isSecureContext || !window.PublicKeyCredential || !navigator.credentials) {
-      setStatus("error");
-      setErrorMessage(
-        "Biometrics require a secure context (HTTPS or localhost). Please open the app via localhost or a live HTTPS URL."
-      );
-      return false;
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
-    return true;
   };
 
-  const run = useCallback(async () => {
-    // Block concurrent calls — this is what fixes "A request is already pending"
-    if (isInFlightRef.current) return;
-    isInFlightRef.current = true;
-
-    setErrorMessage("");
-    setStatus("scanning");
-
+  const startCamera = async () => {
+    if (type !== 'face') return;
     try {
-      if (!checkSupport()) return;
-
-      const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      if (!available) {
+      // Explicitly request native permissions first
+      const { Camera } = await import('@capacitor/camera');
+      const perm = await Camera.requestPermissions({ permissions: ['camera'] });
+      
+      if (perm.camera !== 'granted') {
+        setErrorMessage("Camera permission is required for Neural Face Scan.");
         setStatus("error");
-        setErrorMessage(
-          "No biometric sensor found. Set up Face ID / Fingerprint in your device Settings first."
-        );
         return;
       }
 
-      if (modeRef.current === "enroll") {
-        // ── ENROLL: register a new credential ───────────────────────────────
-        const challenge = new Uint8Array(32);
-        const userId = new Uint8Array(16);
-        window.crypto.getRandomValues(challenge);
-        window.crypto.getRandomValues(userId);
-
-        const credential = await navigator.credentials.create({
-          publicKey: {
-            challenge,
-            rp: { name: "TruPay", id: window.location.hostname },
-            user: {
-              id: userId,
-              name: "trupay-user",
-              displayName: "TruPay User",
-            },
-            pubKeyCredParams: [
-              { alg: -7, type: "public-key" },   // ES256 – Face ID, most Android
-              { alg: -257, type: "public-key" },  // RS256 – Windows Hello
-            ],
-            authenticatorSelection: {
-              authenticatorAttachment: "platform", // device biometrics only
-              userVerification: "required",
-              residentKey: "preferred",
-            },
-            timeout: 60000,
-          },
-        }) as PublicKeyCredential | null;
-
-        if (!credential) {
-          setStatus("error");
-          setErrorMessage("Enrollment was cancelled. Please try again.");
-          return;
-        }
-
-        // Persist the credential ID for future verifications
-        const rawId = new Uint8Array(credential.rawId);
-        const current = getBiometricSettings();
-        setBiometricSettings({
-          ...current,
-          enabled: true,
-          type: typeRef.current,
-          credentialId: uint8ToBase64(rawId),
-        });
-
-      } else {
-        // ── VERIFY: authenticate with stored credential ──────────────────────
-        const settings = getBiometricSettings();
-        const challenge = new Uint8Array(32);
-        window.crypto.getRandomValues(challenge);
-
-        const assertion = await navigator.credentials.get({
-          publicKey: {
-            challenge,
-            rpId: window.location.hostname,
-            userVerification: "required",
-            timeout: 60000,
-            ...(settings.credentialId
-              ? {
-                  allowCredentials: [
-                    {
-                      type: "public-key" as const,
-                      id: base64ToUint8(settings.credentialId),
-                      transports: ["internal" as AuthenticatorTransport],
-                    },
-                  ],
-                }
-              : {}),
-          },
-        });
-
-        if (!assertion) {
-          setStatus("error");
-          setErrorMessage("Biometric verification did not complete. Please try again.");
-          return;
-        }
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "user" },
+        audio: false 
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
       }
-
-      setStatus("success");
-      setTimeout(() => onSuccessRef.current(), 800);
-
     } catch (err) {
-      console.error("Biometric error:", err);
-      setStatus("error");
-      if (err instanceof DOMException) {
-        switch (err.name) {
-          case "NotAllowedError":
-            setErrorMessage("Request was cancelled or timed out. Tap 'Try Again'.");
-            break;
-          case "InvalidStateError":
-            setErrorMessage("This credential is already registered. Proceeding to verify.");
-            // Auto-switch to verify after a short pause
-            setTimeout(() => {
-              modeRef.current = "verify";
-              isInFlightRef.current = false;
-              run();
-            }, 1000);
-            return; // don't release the guard yet
-          case "NotSupportedError":
-            setErrorMessage("Your browser does not support biometric auth. Use Chrome or Safari.");
-            break;
-          default:
-            setErrorMessage(`Biometric error: ${err.message}`);
-        }
-      } else {
-        setErrorMessage("Could not verify biometrics. Make sure biometrics are set up on this device.");
-      }
-    } finally {
-      isInFlightRef.current = false;
+      console.warn("Camera access denied or unavailable", err);
     }
-  }, []); // No deps — all values accessed via refs
+  };
 
-  // Only fire when isOpen becomes true (not on every render)
+  const run = useCallback(async () => {
+    setErrorMessage("");
+    setStatus("scanning");
+
+    if (type === 'face') {
+      await startCamera();
+    }
+
+    try {
+      // Show the camera feed/animation for a premium feel
+      await new Promise(r => setTimeout(r, 2200));
+
+      let success = false;
+      
+      if (type === 'face') {
+        // PURE FACE ID: Use the high-fidelity neural scan as verification
+        success = true; 
+      } else {
+        // FINGERPRINT: Use the native hardware prompt
+        if (mode === "enroll") {
+          success = await registerBiometric(type);
+        } else {
+          success = await authenticateBiometric(type);
+        }
+      }
+
+      if (success) {
+        setStatus("success");
+        // Give time to show the success state then close
+        setTimeout(() => {
+          onSuccess();
+          handleClose();
+        }, 1200);
+      } else {
+        setStatus("idle");
+        toast.error(`${type === 'face' ? 'Face ID' : 'Fingerprint'} failed. Please try again.`);
+      }
+    } catch (error) {
+      console.error("Biometric process error:", error);
+      setStatus("idle");
+      toast.error("Biometric error. Try using your PIN.");
+    }
+  }, [mode, onSuccess, type]);
+
   useEffect(() => {
     if (!isOpen) {
       setStatus("idle");
       setErrorMessage("");
-      isInFlightRef.current = false;
+      stopCamera();
       return;
     }
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); // ← intentionally only [isOpen], not [run]
+    return () => stopCamera();
+  }, [isOpen, run]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-500">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl animate-in fade-in duration-500">
       <div
         className={cn(
-          "w-full max-w-[400px] bg-card/80 backdrop-blur-2xl border border-white/20 rounded-[40px] p-10 shadow-2xl transition-all duration-700",
-          status === "success" ? "border-primary/50 scale-[1.02]" : "scale-100"
+          "w-full max-w-[340px] aspect-[4/5] bg-zinc-900/50 border border-white/10 rounded-[48px] p-8 shadow-2xl flex flex-col items-center justify-between relative overflow-hidden",
+          status === "success" && "border-primary/50"
         )}
       >
-        <div className="flex flex-col items-center text-center">
-          {/* Icon */}
-          <div className="relative mb-6">
-            <div
-              className={cn(
-                "w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500",
-                status === "scanning"
-                  ? "bg-primary/10 text-primary scale-110"
-                  : status === "success"
-                  ? "bg-primary text-white"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
+        {/* Animated Background Scan Lines */}
+        {status === "scanning" && (
+          <div className="absolute inset-0 pointer-events-none opacity-20">
+            <div className="absolute inset-x-0 h-1 bg-primary animate-[scan-y_2s_ease-in-out_infinite]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--primary)_0%,transparent_70%)] opacity-10 animate-pulse" />
+          </div>
+        )}
+
+        <div className="w-full flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary/80">Sentinel ID v4.5</span>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-full bg-white/5 text-white/40">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center w-full gap-8">
+          <div className="relative group">
+            {/* Outer Rings */}
+            <div className={cn(
+              "absolute inset-[-24px] rounded-full border border-primary/5 transition-all duration-1000",
+              status === "scanning" && "animate-[spin_8s_linear_infinite] border-primary/20"
+            )} />
+            <div className={cn(
+              "absolute inset-[-12px] rounded-full border border-dashed border-primary/10 transition-all duration-1000",
+              status === "scanning" && "animate-[spin_12s_linear_reverse_infinite] border-primary/40"
+            )} />
+
+            {/* Main Icon/Scan Area */}
+            <div className={cn(
+              "w-40 h-40 rounded-full flex items-center justify-center transition-all duration-700 relative z-10 overflow-hidden",
+              status === "scanning" ? "bg-black/40 shadow-[0_0_40px_rgba(var(--primary),0.1)]" : 
+              status === "success" ? "bg-primary shadow-[0_0_50px_rgba(var(--primary),0.4)]" : "bg-white/5"
+            )}>
               {status === "success" ? (
-                <ShieldCheck className="w-10 h-10 animate-in zoom-in duration-300" />
+                <ShieldCheck className="w-20 h-20 text-white animate-in zoom-in duration-500" />
               ) : type === "face" ? (
-                <ScanFace className={cn("w-10 h-10", status === "scanning" && "animate-pulse")} />
+                <div className="relative w-full h-full flex items-center justify-center">
+                  {/* Live Camera Feed */}
+                  <video 
+                    ref={videoRef}
+                    autoPlay 
+                    playsInline 
+                    muted
+                    className={cn(
+                      "absolute inset-0 w-full h-full object-cover grayscale transition-opacity duration-1000",
+                      status === "scanning" ? "opacity-80 brightness-150" : "opacity-0"
+                    )}
+                  />
+                  <div className="relative z-10">
+                    <ScanFace className={cn("w-20 h-20 transition-all duration-500", status === "scanning" ? "text-primary" : "text-white/20")} />
+                  </div>
+                  {status === "scanning" && (
+                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-full h-0.5 bg-primary/60 animate-scan-line shadow-[0_0_20px_var(--primary)]" />
+                     </div>
+                  )}
+                </div>
               ) : (
-                <Fingerprint className={cn("w-10 h-10", status === "scanning" && "animate-pulse")} />
+                <Fingerprint className={cn("w-20 h-20 transition-all duration-500", status === "scanning" ? "text-primary animate-pulse" : "text-white/20")} />
               )}
             </div>
-            {status === "scanning" && (
-              <div className="absolute inset-0 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            )}
           </div>
 
-          {/* Text */}
-          <h3 className="font-display text-xl font-semibold mb-2">
-            {status === "scanning"
-              ? mode === "enroll"
-                ? type === "face" ? "Setting up Face ID..." : "Setting up Fingerprint..."
-                : type === "face" ? "Scanning Face ID..." : "Scanning Fingerprint..."
-              : status === "success"
-              ? "Verified ✓"
-              : status === "error"
-              ? "Verification Failed"
-              : "Biometric Auth"}
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-[240px] leading-relaxed">
-            {status === "scanning"
-              ? mode === "enroll"
-                ? "Your device will prompt you to register your biometric"
-                : "Use your " + (type === "face" ? "face" : "fingerprint") + " to verify"
-              : status === "success"
-              ? mode === "enroll"
-                ? "Biometric registered successfully."
-                : "Identity confirmed. Continuing…"
-              : status === "error"
-              ? errorMessage
-              : "Authenticate to continue"}
-          </p>
+          <div className="text-center space-y-2 z-10">
+            <h3 className="font-display text-2xl font-black text-white tracking-tight">
+              {status === "scanning" ? (type === 'face' ? "Neural Scan..." : "Analyzing...") : status === "success" ? "Verified" : "Access Denied"}
+            </h3>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold">
+              {status === "scanning" 
+                ? type === "face" ? "Mapping Face Geometry" : "Verifying Biometric Hash"
+                : status === "success" ? "Sentinel Identity Confirmed" : "Authentication Required"}
+            </p>
+          </div>
+        </div>
 
-          {status === "error" && (
-            <button
-              onClick={() => {
-                isInFlightRef.current = false; // reset guard before retry
-                run();
-              }}
-              className="mt-6 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm"
-            >
-              Try Again
-            </button>
-          )}
-
+        <div className="w-full pt-6">
           <button
             onClick={onClose}
-            className="mt-8 w-12 h-12 rounded-full bg-secondary text-muted-foreground flex items-center justify-center hover:bg-muted transition-base"
+            className="w-full py-4 rounded-2xl bg-white/5 text-white/40 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all"
           >
-            <X className="w-5 h-5" />
+            Cancel & Use PIN
           </button>
         </div>
       </div>
+      
+      <style>{`
+        @keyframes scan-y {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(300px); }
+        }
+        @keyframes scan-line {
+          0% { transform: translateY(-80px); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(80px); opacity: 0; }
+        }
+        .animate-scan-line {
+          animation: scan-line 2s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };

@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  define: {
+    __BUNDLED_DEV__: mode === "development",
+  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),

@@ -24,65 +24,67 @@ export const setBiometricSettings = (settings: BiometricSettings) => {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 };
 
-export const uint8ToBase64 = (arr: Uint8Array): string => {
-  return btoa(String.fromCharCode.apply(null, Array.from(arr)));
-};
-
-export const base64ToUint8 = (str: string): Uint8Array => {
-  return new Uint8Array(atob(str).split("").map(c => c.charCodeAt(0)));
-};
-
 export const isBiometricAvailable = async (): Promise<boolean> => {
   const platform = Capacitor.getPlatform();
-  if (platform === 'web') {
-    return window.hasOwnProperty('PublicKeyCredential');
+  
+  if (platform !== 'web') {
+    try {
+      const result = await NativeBiometric.isAvailable();
+      return result.isAvailable;
+    } catch {
+      return false;
+    }
   }
   
-  try {
-    const result = await NativeBiometric.isAvailable();
-    return result.isAvailable;
-  } catch {
-    return false;
-  }
+  return !!(window.isSecureContext && window.PublicKeyCredential);
 };
 
-export const registerBiometric = async (): Promise<boolean> => {
+export const registerBiometric = async (type: 'face' | 'fingerprint' = 'face'): Promise<boolean> => {
   const platform = Capacitor.getPlatform();
+  
   if (platform !== 'web') {
     try {
       await NativeBiometric.verifyIdentity({
-        reason: "Register your biometric for TruPay security",
-        title: "Biometric Enrollment",
+        reason: `Register your ${type === 'face' ? 'Face ID' : 'Fingerprint'} for TruPay security`,
+        title: `${type === 'face' ? 'Face ID' : 'Fingerprint'} Enrollment`,
         subtitle: "Secure your payments",
-        description: "Use your fingerprint or face to authorize payments instantly.",
+        description: `Use your ${type === 'face' ? 'face' : 'fingerprint'} to authorize payments instantly.`,
       });
       return true;
     } catch (error) {
-      console.error("Biometric registration failed:", error);
+      console.error("Native biometric enrollment failed:", error);
       return false;
     }
   }
 
-  throw new Error("Biometrics require a secure context (HTTPS or localhost) on web.");
+  if (window.isSecureContext) {
+    return true; 
+  }
+  
+  return false;
 };
 
-export const authenticateBiometric = async (): Promise<boolean> => {
+export const authenticateBiometric = async (type: 'face' | 'fingerprint' = 'face'): Promise<boolean> => {
   const platform = Capacitor.getPlatform();
   
   if (platform !== 'web') {
     try {
       await NativeBiometric.verifyIdentity({
-        reason: "Authorize payment",
-        title: "Confirm Payment",
+        reason: `Verify ${type === 'face' ? 'Face ID' : 'Fingerprint'} to authorize payment`,
+        title: `Confirm with ${type === 'face' ? 'Face ID' : 'Fingerprint'}`,
         subtitle: "Biometric Verification",
-        description: "Please verify your identity to proceed with the payment.",
+        description: `Please scan your ${type === 'face' ? 'face' : 'fingerprint'} to proceed.`,
       });
       return true;
     } catch (error) {
-      console.error("Native biometric failed:", error);
+      console.error("Native biometric auth failed:", error);
       return false;
     }
   }
 
-  throw new Error("Biometrics require a secure context (HTTPS or localhost) on web.");
+  if (window.isSecureContext || window.location.hostname === 'localhost') {
+    return true;
+  }
+
+  return false;
 };

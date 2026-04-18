@@ -1,188 +1,227 @@
-import { useEffect, useState } from "react";
+// TruPay Risk Analysis Component - v2.4.2 (Neural Learning Update)
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, ShieldAlert, AlertTriangle, ChevronRight, Lightbulb, X, Flag } from "lucide-react";
+import { useState } from "react";
+import { 
+  ArrowLeft, 
+  ShieldAlert, 
+  ShieldCheck, 
+  Activity, 
+  Lightbulb, 
+  X, 
+  CheckCircle2, 
+  Loader2,
+  ShieldMinus
+} from "lucide-react";
 import { PhoneShell } from "@/components/PhoneShell";
-import { Contact, ScamScenario } from "@/data/mockData";
+import { Contact } from "@/data/mockData";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-interface State {
-  contact: Contact;
-  amount: number;
-  note: string;
-  scenario?: ScamScenario; // Made optional
-  score: number;
+interface RiskScenario {
+  scamType: string;
+  aiSummary: string;
+  threatLevel: "high" | "medium" | "low";
+  attackFlow: string[];
 }
 
-const DEFAULT_SCENARIO: ScamScenario = {
-  scamType: "Suspicious Activity Detected",
-  tagline: "AI Shield has detected patterns often associated with financial fraud.",
-  aiSummary: "Your payment of ₹{amount} was flagged because the recipient's behavioral patterns match known high-risk signatures in our database.",
-  rules: [
-    { id: "R1", label: "High Risk Recipient", detail: "This VPA has been flagged for unusual transaction volume.", severity: "high" },
-    { id: "R2", label: "Pattern Mismatch", detail: "The payment behavior does not align with typical peer-to-peer transfers.", severity: "medium" }
-  ],
-  attackFlow: [
-    { step: 1, title: "Initial Contact", description: "The sender is contacted via social media or messaging apps." },
-    { step: 2, title: "Pressure Tactic", description: "Urgency is created to force a quick payment." },
-    { step: 3, title: "Payment Request", description: "Funds are requested via a specific UPI handle." }
-  ],
-  recommendation: "Cancel this payment and verify the recipient's identity through a secondary, trusted channel."
+const DEFAULT_SCENARIO: RiskScenario = {
+  scamType: "Suspicious Behavior",
+  aiSummary: "Multiple risk markers detected for amount ₹{amount}.",
+  threatLevel: "high",
+  attackFlow: ["Unusual transaction timing", "New recipient with no history", "Amount exceeds safe threshold"]
 };
+
+// Flask Feedback Endpoint
+const FEEDBACK_URL = "http://10.10.37.139:5000/feedback";
 
 const Risk = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as State | undefined;
-  const [animatedScore, setAnimatedScore] = useState(0);
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
 
-  useEffect(() => {
-    if (!state) navigate("/", { replace: true });
-  }, [state, navigate]);
-
-  useEffect(() => {
-    if (!state) return;
-    let frame = 0;
-    const target = state.score || 70;
-    const id = setInterval(() => {
-      frame += 2;
-      if (frame >= target) {
-        setAnimatedScore(target);
-        clearInterval(id);
-      } else {
-        setAnimatedScore(frame);
-      }
-    }, 16);
-    return () => clearInterval(id);
-  }, [state]);
+  const state = location.state as {
+    contact: Contact;
+    amount: number;
+    note?: string;
+    scenario?: RiskScenario;
+    score: number;
+  };
 
   if (!state) return null;
   const { contact, amount } = state;
-  const scenario = state.scenario || DEFAULT_SCENARIO; // Fallback to safe default
+  const scenario = state.scenario || DEFAULT_SCENARIO;
 
-  const summary = (scenario.aiSummary || "Suspicious activity detected for amount ₹{amount}").replace("{amount}", amount.toLocaleString("en-IN"));
+  const handleReportAndBlock = async () => {
+    setIsReporting(true);
+    
+    try {
+      // 1. Inform the server to LEARN this fraud pattern
+      await fetch(FEEDBACK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          upiId: contact.upi,
+          scamType: scenario.scamType,
+          amount: amount,
+          features: [] 
+        })
+      });
+
+      // 2. Artificial delay for "Learning Animation" impact
+      await new Promise(r => setTimeout(r, 4000));
+      
+      setIsReporting(false);
+      setReportSuccess(true);
+      
+      // 3. Show Success and redirect
+      setTimeout(() => {
+        toast.success("Sentinel Intelligence Updated", {
+          description: "This fraud pattern has been neutralized globally."
+        });
+        window.scrollTo(0, 0);
+        navigate("/home", { replace: true });
+      }, 3500);
+
+    } catch (err) {
+      console.error("Learning Error:", err);
+      setIsReporting(false);
+      toast.error("Feedback Link Offline", {
+        description: "Local block applied. Global learning failed."
+      });
+      navigate("/home", { replace: true });
+    }
+  };
 
   const sevColor = (s: "high" | "medium" | "low") =>
     s === "high"
-      ? "bg-destructive/10 text-destructive border-destructive/20"
+      ? "text-destructive border-destructive/20 bg-destructive/10"
       : s === "medium"
-      ? "bg-warning/15 text-warning-foreground border-warning/30"
-      : "bg-muted text-muted-foreground border-border";
+      ? "text-amber-500 border-amber-500/20 bg-amber-500/10"
+      : "text-emerald-500 border-emerald-500/20 bg-emerald-500/10";
 
   return (
     <PhoneShell hideNav>
-      <div className="flex flex-col h-full bg-background overflow-hidden">
+      <div className="flex flex-col min-h-screen bg-background p-6 select-none relative overflow-hidden">
+        
+        {/* Learning Overlay */}
+        {isReporting && (
+          <div className="fixed inset-0 z-[500] bg-zinc-950/98 backdrop-blur-2xl flex flex-col items-center justify-center p-10 text-center animate-in fade-in duration-700 overflow-hidden">
+            <div className="relative mb-8">
+              <Loader2 className="w-32 h-32 text-primary animate-spin" strokeWidth={0.5} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ShieldAlert className="w-12 h-12 text-primary animate-pulse" />
+              </div>
+            </div>
+            <h2 className="text-3xl font-display font-black text-white mb-3 tracking-tight">Neural Deep Learning</h2>
+            <p className="text-zinc-500 text-sm leading-relaxed max-w-[280px] font-medium uppercase tracking-widest text-[10px]">
+              Analyzing behavioral markers... <br/> Syncing to Global Sentinel Cloud
+            </p>
+            <div className="mt-12 flex gap-3">
+              <div className="h-1 w-16 bg-primary rounded-full animate-pulse shadow-glow" />
+              <div className="h-1 w-16 bg-primary/40 rounded-full animate-pulse delay-150" />
+              <div className="h-1 w-16 bg-primary/10 rounded-full animate-pulse delay-300" />
+            </div>
+          </div>
+        )}
+
+        {/* Success Overlay */}
+        {reportSuccess && (
+          <div className="fixed inset-0 z-[510] bg-emerald-600 flex flex-col items-center justify-center p-10 text-center animate-in zoom-in duration-700 overflow-hidden">
+            <div className="w-28 h-28 rounded-[40px] bg-white/20 flex items-center justify-center mb-10 animate-bounce shadow-2xl">
+              <CheckCircle2 className="w-14 h-14 text-white" />
+            </div>
+            <h2 className="text-4xl font-display font-black text-white mb-3">Identity Blocked</h2>
+            <p className="text-white/80 text-sm leading-relaxed max-w-[280px] font-medium uppercase tracking-widest text-[10px]">
+              Sentinel Database Synchronized. <br/> Threat successfully neutralized.
+            </p>
+          </div>
+        )}
+
         {/* Header */}
-        <header className="shrink-0 px-5 pt-12 pb-3 flex items-center gap-3 animate-fade-in border-b border-border/10">
+        <header className="flex items-center gap-4 mb-8">
           <button
             onClick={() => navigate(-1)}
-            className="w-9 h-9 rounded-full bg-card border border-border flex items-center justify-center hover:bg-secondary transition-colors shadow-sm"
+            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="flex-1">
-            <p className="text-[10px] text-destructive font-black tracking-[0.2em] uppercase">AI Shield Alert</p>
-            <p className="text-sm font-bold">Risk Assessment Report</p>
-          </div>
-          <ShieldAlert className="w-5 h-5 text-destructive animate-pulse" />
+          <h1 className="text-xl font-display font-black">Risk Analysis</h1>
         </header>
 
-        <div className="flex-1 overflow-y-auto no-scrollbar pb-10">
-          {/* Risk score ring */}
-          <section className="px-5 mt-4 animate-slide-up">
-            <div className="rounded-[32px] bg-zinc-900 text-white p-6 shadow-2xl relative overflow-hidden border border-white/5">
-              <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-destructive/20 blur-3xl opacity-50" />
-              <div className="relative flex items-center gap-6">
-                <RiskRing score={animatedScore} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/50 font-black mb-1">Risk Score</p>
-                  <p className="font-display text-4xl font-black leading-tight text-white">{animatedScore}%</p>
-                  <p className="text-xs text-destructive font-bold mt-1 uppercase tracking-wider">{scenario.scamType}</p>
-                </div>
-              </div>
-              <p className="text-xs text-white/60 mt-4 leading-relaxed font-medium">{scenario.tagline}</p>
+        {/* Threat Level */}
+        <div className="flex flex-col items-center text-center mb-10">
+          <div className="relative mb-6">
+            <div className="w-24 h-24 rounded-[32px] bg-destructive/10 border border-destructive/20 flex items-center justify-center animate-risk-pulse">
+              <ShieldAlert className="w-12 h-12 text-destructive" />
             </div>
-          </section>
-
-          {/* Payee + amount */}
-          <section className="px-5 mt-4 animate-slide-up" style={{ animationDelay: "60ms" }}>
-            <div className="rounded-[28px] bg-card border border-border p-4 flex items-center gap-4 shadow-card">
-              <div className="w-11 h-11 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center font-display font-black text-sm">
-                {contact.initials || contact.name[0]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-black truncate">{contact.name}</p>
-                <p className="text-[10px] text-muted-foreground truncate uppercase tracking-widest font-medium">{contact.upi}</p>
-              </div>
-              <p className="font-display text-lg font-black text-foreground">₹{amount.toLocaleString("en-IN")}</p>
+            <div className="absolute -bottom-2 -right-2 bg-background border border-border px-3 py-1 rounded-full shadow-sm">
+              <span className="text-[10px] font-black uppercase tracking-widest text-destructive">
+                {state.score}% Score
+              </span>
             </div>
-          </section>
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-2">
+            AI Sentinel Verdict
+          </p>
+          <h2 className="text-3xl font-display font-black text-foreground mb-4">
+            {scenario.scamType} Detected
+          </h2>
+          <div className={cn("px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest", sevColor(scenario.threatLevel))}>
+            {scenario.threatLevel} severity threat
+          </div>
+        </div>
 
+        {/* Risk details scrollable area */}
+        <div className="flex-1 space-y-6 overflow-y-auto no-scrollbar pb-10">
           {/* AI summary */}
           <Block icon={<Lightbulb className="w-4 h-4" />} title="Why our AI flagged this" delay={120}>
-            <p className="text-sm leading-relaxed text-foreground/80 font-medium">{summary}</p>
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                {scenario.aiSummary.replace("{amount}", amount.toLocaleString("en-IN"))}
+              </p>
+            </div>
           </Block>
 
-          {/* Detection rules */}
-          <Block icon={<AlertTriangle className="w-4 h-4" />} title="Triggered detection rules" delay={180}>
+          {/* Security Engine Output */}
+          <Block icon={<Activity className="w-4 h-4" />} title="Security Engine Output" delay={180}>
             <div className="space-y-3">
-              {(scenario.rules || []).map((r) => (
-                <div key={r.id} className="flex gap-4 items-start">
-                  <span className={cn("text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border shrink-0 mt-0.5 shadow-sm", sevColor(r.severity))}>
-                    {r.severity}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground">{r.label}</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed mt-0.5 font-medium">{r.detail}</p>
+              {scenario.attackFlow.map((step, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-secondary/50 border border-border/50 animate-in slide-in-from-right duration-500"
+                  style={{ animationDelay: `${200 + i * 100}ms` }}
+                >
+                  <div className="w-8 h-8 rounded-xl bg-background flex items-center justify-center text-[10px] font-black text-destructive shadow-sm">
+                    {i + 1}
                   </div>
+                  <p className="text-xs font-bold text-foreground/80">{step}</p>
                 </div>
               ))}
             </div>
           </Block>
 
-          {/* Attack flow */}
-          <Block icon={<ChevronRight className="w-4 h-4" />} title="How this scam works" delay={240}>
-            <ol className="relative border-l-2 border-dashed border-border/50 ml-2.5 space-y-5 my-2">
-              {(scenario.attackFlow || []).map((s) => (
-                <li key={s.step} className="pl-6 relative">
-                  <span className="absolute -left-[13px] top-0 w-6 h-6 rounded-xl bg-zinc-900 text-white text-[10px] font-black flex items-center justify-center font-display border border-white/10 shadow-lg">
-                    {s.step}
-                  </span>
-                  <p className="text-sm font-bold leading-tight text-foreground">{s.title}</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed mt-1 font-medium">{s.description}</p>
-                </li>
-              ))}
-            </ol>
-          </Block>
-
-          {/* Recommendation */}
-          <section className="px-5 mt-4 animate-slide-up" style={{ animationDelay: "300ms" }}>
-            <div className="rounded-[28px] border-2 border-destructive/20 bg-destructive/5 p-5 shadow-sm">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-destructive font-black mb-2">Recommended action</p>
-              <p className="text-sm font-bold leading-relaxed text-foreground">{scenario.recommendation}</p>
-            </div>
-          </section>
-
-          {/* Actions */}
-          <section className="px-5 mt-6 mb-10 space-y-3 animate-slide-up" style={{ animationDelay: "360ms" }}>
+          {/* Footer actions */}
+          <div className="pt-6 space-y-4">
             <button
-              onClick={() => navigate("/", { replace: true })}
-              className="w-full py-5 rounded-[28px] bg-destructive text-white font-display font-black text-lg shadow-glow-destructive flex items-center justify-center gap-3 hover:brightness-110 active:scale-95 transition-all"
+              id="report-block-btn"
+              onClick={handleReportAndBlock}
+              disabled={isReporting || reportSuccess}
+              className="w-full py-5 rounded-[28px] bg-foreground text-background font-display font-black text-lg shadow-lg hover:brightness-90 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
             >
-              <X className="w-5 h-5" /> Cancel Payment
+              <ShieldMinus className="w-5 h-5" />
+              Report & Block User
             </button>
             <button
-              onClick={() => navigate("/", { replace: true })}
-              className="w-full py-4 rounded-2xl bg-card border border-border text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center justify-center gap-2 hover:border-destructive/40 hover:text-destructive transition-all"
+              onClick={() => navigate(-1)}
+              className="w-full py-5 rounded-[28px] bg-secondary text-foreground font-display font-black text-lg hover:bg-secondary/80 transition-all active:scale-[0.98]"
             >
-              <Flag className="w-4 h-4 text-destructive" /> Report VPA
+              I want to cancel
             </button>
-            <button
-              onClick={() => navigate("/", { replace: true })}
-              className="w-full py-3 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 hover:text-foreground transition-colors"
-            >
-              I understand the risk — proceed anyway
-            </button>
-          </section>
+            <p className="text-center text-[10px] text-muted-foreground font-medium px-10 leading-relaxed">
+              TruPay AI Shield acts as an advisory. Always verify recipients before sending money.
+            </p>
+          </div>
         </div>
       </div>
     </PhoneShell>
@@ -193,53 +232,27 @@ const Block = ({
   icon,
   title,
   children,
-  delay,
+  delay
 }: {
   icon: React.ReactNode;
   title: string;
   children: React.ReactNode;
   delay: number;
 }) => (
-  <section className="px-5 mt-4 animate-slide-up" style={{ animationDelay: `${delay}ms` }}>
-    <div className="rounded-[32px] bg-card border border-border p-5 shadow-card overflow-hidden">
-      <div className="flex items-center gap-3 mb-4 text-primary">
-        <div className="p-2 rounded-xl bg-primary/10">
-          {icon}
-        </div>
-        <h3 className="font-display font-black text-[10px] uppercase tracking-[0.2em] text-foreground">{title}</h3>
+  <div
+    className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700"
+    style={{ animationDelay: `${delay}ms` }}
+  >
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+        {icon}
       </div>
-      {children}
+      <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+        {title}
+      </h3>
     </div>
-  </section>
+    <div className="bg-card border border-border rounded-3xl p-6 shadow-sm">{children}</div>
+  </div>
 );
-
-const RiskRing = ({ score }: { score: number }) => {
-  const r = 30;
-  const c = 2 * Math.PI * r;
-  const offset = c - (score / 100) * c;
-  return (
-    <div className="relative w-20 h-20 shrink-0">
-      <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r={r} stroke="currentColor" strokeWidth="6" fill="none" className="text-white/10" />
-        <circle
-          cx="40"
-          cy="40"
-          r={r}
-          stroke="currentColor"
-          strokeWidth="6"
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-          className="text-destructive transition-all duration-1000 ease-out shadow-glow-destructive"
-          style={{ filter: "drop-shadow(0 0 4px rgba(239, 68, 68, 0.5))" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <ShieldAlert className="w-6 h-6 text-destructive" />
-      </div>
-    </div>
-  );
-};
 
 export default Risk;
