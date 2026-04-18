@@ -1,36 +1,27 @@
-import { TRANSACTIONS as MOCK_DATA } from "@/data/mockData";
+import { Transaction, TRANSACTIONS } from "@/data/mockData";
 
-export interface Transaction {
-  id: string;
-  name: string;
-  amount: number;
-  type: 'sent' | 'received';
-  time: string;
-  shielded?: boolean;
-}
-
-const STORAGE_KEY = 'trupay_transactions';
+const STORAGE_KEY = "trupay_transactions";
 
 export const getTransactions = (): Transaction[] => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return [];
-    }
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) {
+    // Initialize with mock data if empty
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(TRANSACTIONS));
+    return TRANSACTIONS;
   }
-  
-  // For the hackathon demo, if we want NO dummy data for new users:
-  return [];
+  return JSON.parse(saved);
 };
 
-export const addTransaction = (transaction: Omit<Transaction, 'id' | 'time'>) => {
+export const addTransaction = (transaction: Omit<Transaction, "id" | "time">) => {
   const transactions = getTransactions();
   const newTransaction: Transaction = {
     ...transaction,
-    id: Math.random().toString(36).substr(2, 9),
-    time: "Just now"
+    id: "tx-" + Date.now(),
+    time: "Today, " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: "success"
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([newTransaction, ...transactions]));
+  
+  const updated = [newTransaction, ...transactions];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  return newTransaction;
 };

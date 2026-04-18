@@ -21,39 +21,50 @@ const Success = () => {
 
   return (
     <PhoneShell hideNav>
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+      <div className="h-full flex flex-col items-center justify-center px-6 text-center bg-background overflow-hidden select-none">
+        
+        {/* Animated Success Badge */}
         <div className="relative animate-slide-up">
           <div className="w-24 h-24 rounded-full bg-success/15 flex items-center justify-center animate-shield-pulse">
-            <div className="w-16 h-16 rounded-full bg-success flex items-center justify-center">
-              <Check className="w-8 h-8 text-success-foreground" strokeWidth={3} />
+            <div className="w-16 h-16 rounded-full bg-success flex items-center justify-center shadow-lg shadow-success/20">
+              <Check className="w-8 h-8 text-success-foreground" strokeWidth={4} />
             </div>
           </div>
         </div>
 
-        <p className="font-display text-4xl font-semibold mt-6 tabular-nums">
-          ₹{amount.toLocaleString("en-IN")}
-        </p>
-        <p className="text-sm text-muted-foreground mt-1">paid to {contact.name}</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">{contact.upi}</p>
+        {/* Amount Section */}
+        <div className="mt-8 space-y-1 animate-slide-up" style={{ animationDelay: "100ms" }}>
+          <p className="font-display text-5xl font-black tabular-nums tracking-tighter">
+            ₹{amount.toLocaleString("en-IN")}
+          </p>
+          <div className="flex flex-col">
+            <p className="text-base font-bold text-foreground opacity-70">paid to {contact.name}</p>
+            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1">{contact.upi}</p>
+          </div>
+        </div>
 
-        <div className="mt-8 flex flex-col gap-2">
-          <div className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            AI Shield verified · {score ?? 5}% risk
+        {/* Trust Badges */}
+        <div className="mt-10 flex flex-col gap-3 animate-slide-up" style={{ animationDelay: "200ms" }}>
+          <div className="inline-flex items-center justify-center gap-2.5 px-4 py-2 rounded-full bg-primary/5 text-primary text-[10px] font-black uppercase tracking-widest border border-primary/10">
+            <ShieldCheck className="w-4 h-4" />
+            AI Shield Verified · {score ?? 0}% Risk
           </div>
           
-          <div className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 text-xs font-bold animate-in zoom-in duration-500 delay-300">
+          <div className="inline-flex items-center justify-center gap-2.5 px-4 py-2 rounded-full bg-yellow-400/10 text-yellow-700 dark:text-yellow-400 text-[10px] font-black uppercase tracking-widest border border-yellow-400/20 animate-in zoom-in duration-700 delay-500">
             <span className="text-sm">🪙</span>
             2X TruCoins Earned!
           </div>
         </div>
 
-        <button
-          onClick={() => navigate("/home", { replace: true })}
-          className="mt-10 w-full max-w-xs py-4 rounded-2xl bg-gradient-primary text-primary-foreground font-display font-semibold shadow-glow"
-        >
-          Done
-        </button>
+        {/* Action Button */}
+        <div className="mt-12 w-full max-w-[280px] animate-slide-up" style={{ animationDelay: "300ms" }}>
+          <button
+            onClick={() => navigate("/home", { replace: true })}
+            className="w-full py-5 rounded-[28px] bg-primary text-primary-foreground font-display font-black text-lg shadow-glow hover:brightness-110 active:scale-95 transition-all"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </PhoneShell>
   );
