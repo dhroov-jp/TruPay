@@ -65,7 +65,12 @@ const DesktopHero = () => (
       <h1 className="font-display text-6xl font-semibold tracking-tight leading-[1.05]">
         Pay safely.
         <br />
-        <span className="bg-gradient-primary bg-clip-text text-transparent">Shielded by AI.</span>
+        <span
+          className="bg-clip-text text-transparent"
+          style={{ backgroundImage: "var(--gradient-primary)" }}
+        >
+          Shielded by AI.
+        </span>
       </h1>
       <p className="mt-6 text-lg text-muted-foreground max-w-md">
         TruPay Shield scans every UPI payment in real-time and explains exactly why a transaction
