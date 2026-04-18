@@ -1,84 +1,97 @@
-import { Shield, ShieldCheck, AlertTriangle, Activity, Sparkles } from "lucide-react";
+import { Shield as ShieldIcon, ShieldCheck, Zap, Users, Fingerprint, Activity } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PhoneShell } from "@/components/PhoneShell";
+import { cn } from "@/lib/utils";
 
-const stats = [
-  { icon: ShieldCheck, label: "Payments scanned", value: "127", tint: "text-primary bg-primary/10" },
-  { icon: AlertTriangle, label: "Frauds blocked", value: "4", tint: "text-destructive bg-destructive/10" },
-  { icon: Activity, label: "Avg risk score", value: "8%", tint: "text-success bg-success/10" },
-];
+const Shield = () => {
+  const { t } = useTranslation();
 
-const protections = [
-  { title: "Lookalike VPA detection", desc: "Catches handle impersonation via character substitution." },
-  { title: "Community fraud reports", desc: "Cross-checks every payee against 1.2M reported scam VPAs." },
-  { title: "Behavioural scoring", desc: "Flags unusual amounts, time, and payee patterns in real time." },
-  { title: "Reverse-collect detection", desc: "Warns when an incoming 'refund' is actually a debit." },
-  { title: "QR tamper checks", desc: "Verifies merchant identity before merchant payments." },
-];
-
-const Shield_ = () => (
-  <PhoneShell>
-    <header className="px-5 pt-12 pb-4 animate-fade-in">
-      <h1 className="font-display text-2xl font-semibold flex items-center gap-2">
-        AI Shield
-        <Sparkles className="w-4 h-4 text-primary" />
-      </h1>
-      <p className="text-xs text-muted-foreground">Explainable fraud protection for every UPI payment.</p>
-    </header>
-
-    {/* Hero */}
-    <section className="px-5 animate-slide-up">
-      <div className="rounded-3xl bg-gradient-shield text-primary-foreground p-5 shadow-elevated relative overflow-hidden">
-        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/15 blur-2xl" />
-        <div className="relative flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center animate-shield-pulse">
-            <Shield className="w-7 h-7" />
+  return (
+    <PhoneShell>
+      <div className="px-5 pt-8 pb-24">
+        <header className="mb-8 animate-fade-in">
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="font-display text-3xl font-bold">{t("AI Shield")}</h1>
+            <Zap className="w-6 h-6 text-primary fill-primary/20" />
           </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-widest text-primary-foreground/80">Status</p>
-            <p className="font-display text-xl font-semibold">Active & monitoring</p>
-            <p className="text-xs text-primary-foreground/80">Updated just now</p>
-          </div>
-        </div>
-      </div>
-    </section>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {t("Explainable fraud protection for every UPI payment.")}
+          </p>
+        </header>
 
-    {/* Stats */}
-    <section className="px-5 mt-4 grid grid-cols-3 gap-2 animate-slide-up" style={{ animationDelay: "60ms" }}>
-      {stats.map(({ icon: Icon, label, value, tint }) => (
-        <div key={label} className="bg-card border border-border rounded-2xl p-3 shadow-card">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-2 ${tint}`}>
-            <Icon className="w-4 h-4" />
-          </div>
-          <p className="font-display text-lg font-semibold leading-none">{value}</p>
-          <p className="text-[10px] text-muted-foreground mt-1 leading-tight">{label}</p>
-        </div>
-      ))}
-    </section>
-
-    {/* What's protected */}
-    <section className="px-5 mt-5 animate-slide-up" style={{ animationDelay: "120ms" }}>
-      <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold mb-2 px-1">
-        Active protections
-      </h2>
-      <div className="bg-card border border-border rounded-2xl divide-y divide-border shadow-card overflow-hidden">
-        {protections.map((p) => (
-          <div key={p.title} className="p-4 flex items-start gap-3">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-3.5 h-3.5" strokeWidth={2.5} />
+        {/* Status Card */}
+        <section className="mb-8 animate-slide-up">
+          <div className="relative overflow-hidden rounded-[32px] bg-gradient-shield p-6 text-white shadow-glow">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <ShieldIcon className="w-32 h-32" />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold leading-tight">{p.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{p.desc}</p>
+            <div className="relative flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-inner">
+                <ShieldCheck className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">{t("STATUS")}</p>
+                <h2 className="text-2xl font-display font-bold">{t("Active & monitoring")}</h2>
+                <p className="text-xs text-white/60 mt-1">{t("Updated just now")}</p>
+              </div>
             </div>
           </div>
-        ))}
-      </div>
-    </section>
+        </section>
 
-    <p className="text-center text-[10px] text-muted-foreground mt-6 px-8 leading-relaxed">
-      TruPay Shield uses on-device AI signals + community fraud intelligence. We never read your messages or PIN.
-    </p>
-  </PhoneShell>
+        {/* Stats Grid */}
+        <section className="grid grid-cols-3 gap-3 mb-8 animate-slide-up" style={{ animationDelay: "100ms" }}>
+          <StatCard label={t("Payments scanned")} value="127" icon={Activity} />
+          <StatCard label={t("Frauds blocked")} value="4" icon={ShieldIcon} color="text-destructive" />
+          <StatCard label={t("Avg risk score")} value="8%" icon={Fingerprint} />
+        </section>
+
+        {/* Protection Features */}
+        <section className="space-y-4 animate-slide-up" style={{ animationDelay: "200ms" }}>
+          <h3 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">
+            {t("ACTIVE PROTECTIONS")}
+          </h3>
+          
+          <ProtectionItem 
+            icon={Zap}
+            title={t("Lookalike VPA detection")}
+            desc={t("Catches handle impersonation via character substitution.")}
+          />
+          <ProtectionItem 
+            icon={Users}
+            title={t("Community fraud reports")}
+            desc={t("Cross-checks every payee against 1.2M reported scam VPAs.")}
+          />
+          <ProtectionItem 
+            icon={Fingerprint}
+            title={t("Behavioural scoring")}
+            desc={t("Flags unusual amounts, time, and payee patterns in real time.")}
+          />
+        </section>
+      </div>
+    </PhoneShell>
+  );
+};
+
+const StatCard = ({ label, value, icon: Icon, color = "text-primary" }: { label: string, value: string, icon: any, color?: string }) => (
+  <div className="bg-card border border-border rounded-2xl p-4 shadow-card">
+    <div className={cn("w-8 h-8 rounded-lg bg-secondary flex items-center justify-center mb-3", color)}>
+      <Icon className="w-4 h-4" />
+    </div>
+    <p className="text-xl font-display font-bold mb-1">{value}</p>
+    <p className="text-[10px] text-muted-foreground leading-tight font-medium uppercase tracking-wider">{label}</p>
+  </div>
 );
 
-export default Shield_;
+const ProtectionItem = ({ icon: Icon, title, desc }: { icon: any, title: string, desc: string }) => (
+  <div className="flex items-start gap-4 p-5 rounded-3xl bg-card border border-border shadow-card hover:border-primary/20 transition-all group">
+    <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors shrink-0">
+      <Icon className="w-6 h-6" />
+    </div>
+    <div className="space-y-1">
+      <h4 className="text-sm font-bold">{title}</h4>
+      <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+    </div>
+  </div>
+);
+
+export default Shield;

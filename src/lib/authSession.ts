@@ -44,5 +44,6 @@ export const signOutAndCleanup = async () => {
   }
 
   clearClientAuthState();
-  localStorage.removeItem("trupay_biometrics");
+  // We explicitly DO NOT clear trupay_bank_accounts or trupay_biometric_settings
+  // so that returning users have a seamless experience.
 };

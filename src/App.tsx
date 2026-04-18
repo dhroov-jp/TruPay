@@ -12,6 +12,7 @@ import Success from "./pages/Success.tsx";
 import History from "./pages/History.tsx";
 import Shield from "./pages/Shield.tsx";
 import ScanQR from "./pages/ScanQR.tsx";
+import Rewards from "./pages/Rewards.tsx";
 import Login from "./pages/Login.tsx";
 import OnboardingBiometric from "./pages/OnboardingBiometric.tsx";
 import OnboardingBank from "./pages/OnboardingBank.tsx";
@@ -52,6 +53,7 @@ const App = () => (
           <Route path="/history" element={<RequireAuth><AppLock><History /></AppLock></RequireAuth>} />
           <Route path="/shield" element={<RequireAuth><AppLock><Shield /></AppLock></RequireAuth>} />
           <Route path="/scan" element={<RequireAuth><AppLock><ScanQR /></AppLock></RequireAuth>} />
+          <Route path="/rewards" element={<RequireAuth><AppLock><Rewards /></AppLock></RequireAuth>} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>

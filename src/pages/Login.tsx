@@ -2,16 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Phone, Loader2, ShieldCheck } from "lucide-react";
 import { ConfirmationResult, RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup } from "firebase/auth";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { PhoneShell } from "@/components/PhoneShell";
 import { Input } from "@/components/ui/input";
 import { auth, googleProvider, isFirebaseConfigured } from "@/lib/firebase";
 
 const Login = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState<string | null>(null);
   const [showPhoneFlow, setShowPhoneFlow] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("+91");
+  const [userName, setUserName] = useState("");
+  const [showNameInput, setShowNameInput] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -54,9 +58,31 @@ const Login = () => {
 
     setLoading("google");
     try {
-      await signInWithPopup(auth, googleProvider);
-      toast.success("Google authentication successful.");
-      navigate("/onboarding/biometric");
+      const { Capacitor } = await import('@capacitor/core');
+      const isNative = Capacitor.isNativePlatform();
+      
+      let user;
+      if (isNative) {
+        const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        
+        if (result.user && auth) {
+          const { GoogleAuthProvider, signInWithCredential } = await import('firebase/auth');
+          const credential = GoogleAuthProvider.credential(result.credential?.idToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          user = userCredential.user;
+        }
+      } else {
+        const result = await signInWithPopup(auth, googleProvider);
+        user = result.user;
+      }
+
+      if (user) {
+        // Save name to localStorage for Home page
+        localStorage.setItem("trupay_user_name", user.displayName || "User");
+        toast.success(`Welcome, ${user.displayName}!`);
+        navigate("/onboarding/biometric");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Google sign-in failed.";
       toast.error(message);
@@ -110,8 +136,9 @@ const Login = () => {
     setLoading("otp");
     try {
       await confirmationResult.confirm(otpCode.trim());
-      toast.success("Phone number verified.");
-      navigate("/onboarding/biometric");
+      // After OTP is verified, show the name input
+      setShowNameInput(true);
+      toast.success("Phone number verified. Please enter your name.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "OTP verification failed.";
       toast.error(message);
@@ -120,27 +147,39 @@ const Login = () => {
     }
   };
 
+  const handleSaveName = () => {
+    if (!userName.trim()) {
+      toast.error("Please enter your name.");
+      return;
+    }
+    localStorage.setItem("trupay_user_name", userName.trim());
+    navigate("/onboarding/biometric");
+  };
+
   return (
     <PhoneShell hideNav>
-      <div className="h-full flex flex-col px-8 pt-20 pb-12 bg-background">
-        <div className="flex-1">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-8 shadow-glow animate-in zoom-in duration-500">
-            <span className="text-primary-foreground font-display text-3xl font-bold">T</span>
+      <div className="h-full flex flex-col px-8 pt-20 pb-12 bg-background relative overflow-hidden">
+        {/* Decorative background glow */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-32 -mt-32" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -ml-32 -mb-32" />
+
+        <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10 w-full">
+          <div className="w-24 h-24 rounded-[32px] bg-primary flex items-center justify-center mb-12 shadow-glow animate-in zoom-in duration-700">
+            <span className="text-primary-foreground font-display text-5xl font-bold">T</span>
           </div>
           
-          <h1 className="text-4xl font-display font-bold tracking-tight mb-4 animate-in slide-in-from-left duration-500 delay-100">
-            Experience the <br />
-            <span className="text-primary italic">future</span> of UPI.
+          <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight mb-6 leading-[1.1] animate-in slide-in-from-bottom-4 duration-700 delay-100">
+            {t("Experience the future of UPI.")}
           </h1>
-          <p className="text-muted-foreground text-sm max-w-[240px] leading-relaxed animate-in slide-in-from-left duration-500 delay-200">
-            Secure, AI-powered payments for the next billion users.
+          <p className="text-muted-foreground text-base max-w-[280px] leading-relaxed animate-in slide-in-from-bottom-4 duration-700 delay-200">
+            {t("Secure, AI-powered payments for the next billion users.")}
           </p>
         </div>
 
-        <div className="space-y-4 animate-in slide-in-from-bottom duration-700 delay-300">
+        <div className="space-y-5 relative z-10 animate-in slide-in-from-bottom duration-700 delay-300">
           <button 
             onClick={handleGoogleLogin}
-            className="w-full h-14 rounded-2xl bg-white border border-border flex items-center justify-center gap-3 font-semibold hover:bg-secondary transition-base shadow-sm"
+            className="w-full h-16 rounded-2xl bg-white border border-border flex items-center justify-center gap-3 font-bold hover:bg-secondary transition-all shadow-sm active:scale-[0.98]"
           >
             {loading === "google" ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <>
@@ -152,19 +191,19 @@ const Login = () => {
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                   </svg>
                 </div>
-                Continue with Google
+                {t("Continue with Google")}
               </>
             )}
           </button>
 
           <button 
             onClick={() => setShowPhoneFlow((prev) => !prev)}
-            className="w-full h-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center gap-3 font-bold shadow-glow transition-base hover:opacity-90"
+            className="w-full h-16 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center gap-3 font-bold shadow-glow transition-all hover:opacity-95 active:scale-[0.98]"
           >
             {loading === "phone" || loading === "otp" ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <>
                 <Phone className="w-5 h-5" />
-                {showPhoneFlow ? "Hide Phone Login" : "Continue with Phone"}
+                {showPhoneFlow ? t("Hide Phone Login") : t("Continue with Phone")}
               </>
             )}
           </button>
@@ -229,6 +268,30 @@ const Login = () => {
                     )}
                   </button>
                 </>
+              )}
+
+              {showNameInput && (
+                <div className="space-y-3 pt-2 border-t border-border mt-2">
+                  <div className="space-y-2">
+                    <label htmlFor="user-name" className="text-xs font-semibold text-primary">
+                      Tell us your name
+                    </label>
+                    <Input
+                      id="user-name"
+                      type="text"
+                      placeholder="e.g. Rahul Sharma"
+                      value={userName}
+                      onChange={(event) => setUserName(event.target.value)}
+                      className="h-11 border-primary/20 focus:border-primary"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSaveName}
+                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-bold shadow-glow"
+                  >
+                    Save & Continue
+                  </button>
+                </div>
               )}
             </div>
           )}

@@ -36,9 +36,16 @@ const Success = () => {
         <p className="text-sm text-muted-foreground mt-1">paid to {contact.name}</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">{contact.upi}</p>
 
-        <div className="mt-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          AI Shield verified · {score ?? 5}% risk
+        <div className="mt-8 flex flex-col gap-2">
+          <div className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            AI Shield verified · {score ?? 5}% risk
+          </div>
+          
+          <div className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 text-xs font-bold animate-in zoom-in duration-500 delay-300">
+            <span className="text-sm">🪙</span>
+            2X TruCoins Earned!
+          </div>
         </div>
 
         <button

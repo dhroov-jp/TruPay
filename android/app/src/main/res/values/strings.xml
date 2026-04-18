@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TruPay</string>
+    <string name="title_activity_main">TruPay</string>
+    <string name="package_name">com.trupay.ai</string>
+    <string name="custom_url_scheme">com.trupay.ai</string>
+</resources>
