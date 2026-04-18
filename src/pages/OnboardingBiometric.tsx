@@ -1,19 +1,36 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ScanFace, Fingerprint, ShieldCheck, Loader2 } from "lucide-react";
+import { ScanFace, Fingerprint, Loader2 } from "lucide-react";
 import { PhoneShell } from "@/components/PhoneShell";
+import { BiometricPrompt } from "@/components/BiometricPrompt";
 import { cn } from "@/lib/utils";
+import { setBiometricSettings } from "@/lib/biometrics";
 
 const OnboardingBiometric = () => {
   const navigate = useNavigate();
   const [isEnrolling, setIsEnrolling] = useState(false);
-  const [bioType, setBioType] = useState<"face" | "finger">("face");
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [bioType, setBioType] = useState<"face" | "fingerprint">("face");
 
   const handleEnroll = () => {
     setIsEnrolling(true);
-    setTimeout(() => {
-      navigate("/onboarding/bank");
-    }, 3000);
+    setShowPrompt(true);
+  };
+
+  const handleBiometricSuccess = () => {
+    setBiometricSettings({ enabled: true, type: bioType });
+    setShowPrompt(false);
+    navigate("/onboarding/bank");
+  };
+
+  const handleClosePrompt = () => {
+    setShowPrompt(false);
+    setIsEnrolling(false);
+  };
+
+  const handleSkip = () => {
+    setBiometricSettings({ enabled: false, type: bioType });
+    navigate("/onboarding/bank");
   };
 
   return (
@@ -37,10 +54,10 @@ const OnboardingBiometric = () => {
               <span className="text-[10px] font-bold">Face ID</span>
             </button>
             <button 
-              onClick={() => setBioType("finger")}
+              onClick={() => setBioType("fingerprint")}
               className={cn(
                 "w-24 h-24 rounded-[32px] flex flex-col items-center justify-center gap-2 transition-all border-2",
-                bioType === "finger" ? "bg-primary/5 border-primary text-primary" : "bg-secondary border-transparent text-muted-foreground"
+                bioType === "fingerprint" ? "bg-primary/5 border-primary text-primary" : "bg-secondary border-transparent text-muted-foreground"
               )}
             >
               <Fingerprint className="w-8 h-8" />
@@ -70,19 +87,27 @@ const OnboardingBiometric = () => {
             {isEnrolling ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Scanning...
+                Waiting for biometrics...
               </>
             ) : (
               "Enable Biometrics"
             )}
           </button>
           <button 
-            onClick={() => navigate("/onboarding/bank")}
+            onClick={handleSkip}
             className="w-full py-4 text-muted-foreground text-sm font-semibold"
           >
             Skip for now
           </button>
         </div>
+
+        <BiometricPrompt
+          isOpen={showPrompt}
+          onClose={handleClosePrompt}
+          onSuccess={handleBiometricSuccess}
+          mode="enroll"
+          type={bioType}
+        />
       </div>
     </PhoneShell>
   );

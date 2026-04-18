@@ -1,18 +1,24 @@
 import { useState, useEffect } from "react";
 import { BiometricPrompt } from "./BiometricPrompt";
 import { Shield } from "lucide-react";
+import { getBiometricSettings } from "@/lib/biometrics";
 
 export const AppLock = ({ children }: { children: React.ReactNode }) => {
-  const [isLocked, setIsLocked] = useState(true);
+  const [biometricSettings] = useState(() => getBiometricSettings());
+  const [isLocked, setIsLocked] = useState(() => biometricSettings.enabled);
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
+    if (!biometricSettings.enabled || !isLocked) {
+      return;
+    }
+
     // Show biometric prompt after a short delay on mount
     const timer = setTimeout(() => {
       setShowPrompt(true);
     }, 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [biometricSettings.enabled, isLocked]);
 
   const handleUnlock = () => {
     setShowPrompt(false);
@@ -35,14 +41,14 @@ export const AppLock = ({ children }: { children: React.ReactNode }) => {
         onClick={() => setShowPrompt(true)}
         className="px-8 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold shadow-glow"
       >
-        Unlock App
+        Unlock with {biometricSettings.type === "face" ? "Face ID" : "Touch ID"}
       </button>
 
       <BiometricPrompt
         isOpen={showPrompt}
         onClose={() => {}} // Force authentication
         onSuccess={handleUnlock}
-        type="face"
+        type={biometricSettings.type === "face" ? "face" : "fingerprint"}
       />
     </div>
   );

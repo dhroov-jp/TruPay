@@ -18,6 +18,7 @@ import OnboardingBank from "./pages/OnboardingBank.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 import { AppLock } from "./components/AppLock.tsx";
+import { PublicOnlyRoute, RequireAuth } from "./components/AuthRoute.tsx";
 
 const queryClient = new QueryClient();
 
@@ -29,26 +30,28 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           {/* Public Onboarding Flow */}
-          <Route path="/" element={<Login />} />
-          <Route path="/onboarding/biometric" element={<OnboardingBiometric />} />
-          <Route path="/onboarding/bank" element={<OnboardingBank />} />
+          <Route path="/" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+          <Route path="/onboarding/biometric" element={<RequireAuth><OnboardingBiometric /></RequireAuth>} />
+          <Route path="/onboarding/bank" element={<RequireAuth><OnboardingBank /></RequireAuth>} />
 
           {/* Protected Routes (Require Biometric Lock if enabled) */}
           <Route 
             path="/home" 
             element={
-              <AppLock>
-                <Home />
-              </AppLock>
+              <RequireAuth>
+                <AppLock>
+                  <Home />
+                </AppLock>
+              </RequireAuth>
             } 
           />
-          <Route path="/send" element={<AppLock><SendPage /></AppLock>} />
-          <Route path="/pay" element={<AppLock><Pay /></AppLock>} />
-          <Route path="/risk" element={<AppLock><Risk /></AppLock>} />
-          <Route path="/success" element={<AppLock><Success /></AppLock>} />
-          <Route path="/history" element={<AppLock><History /></AppLock>} />
-          <Route path="/shield" element={<AppLock><Shield /></AppLock>} />
-          <Route path="/scan" element={<AppLock><ScanQR /></AppLock>} />
+          <Route path="/send" element={<RequireAuth><AppLock><SendPage /></AppLock></RequireAuth>} />
+          <Route path="/pay" element={<RequireAuth><AppLock><Pay /></AppLock></RequireAuth>} />
+          <Route path="/risk" element={<RequireAuth><AppLock><Risk /></AppLock></RequireAuth>} />
+          <Route path="/success" element={<RequireAuth><AppLock><Success /></AppLock></RequireAuth>} />
+          <Route path="/history" element={<RequireAuth><AppLock><History /></AppLock></RequireAuth>} />
+          <Route path="/shield" element={<RequireAuth><AppLock><Shield /></AppLock></RequireAuth>} />
+          <Route path="/scan" element={<RequireAuth><AppLock><ScanQR /></AppLock></RequireAuth>} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -1,18 +1,123 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Phone, Mail, ArrowRight, Loader2 } from "lucide-react";
+import { Phone, Loader2, ShieldCheck } from "lucide-react";
+import { ConfirmationResult, RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup } from "firebase/auth";
+import { toast } from "sonner";
 import { PhoneShell } from "@/components/PhoneShell";
-import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { auth, googleProvider, isFirebaseConfigured } from "@/lib/firebase";
 
 const Login = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<string | null>(null);
+  const [showPhoneFlow, setShowPhoneFlow] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("+91");
+  const [otpCode, setOtpCode] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
-  const handleLogin = (type: string) => {
-    setLoading(type);
-    setTimeout(() => {
+  useEffect(() => {
+    return () => {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+    };
+  }, []);
+
+  const getOrCreateRecaptchaVerifier = async () => {
+    if (!auth) {
+      throw new Error("Firebase Auth is not initialized.");
+    }
+
+    if (recaptchaVerifierRef.current) {
+      return recaptchaVerifierRef.current;
+    }
+
+    const verifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+      size: "invisible",
+      callback: () => {
+        // OTP flow continues after successful challenge.
+      },
+    });
+
+    await verifier.render();
+    recaptchaVerifierRef.current = verifier;
+    return verifier;
+  };
+
+  const handleGoogleLogin = async () => {
+    if (!isFirebaseConfigured || !auth || !googleProvider) {
+      toast.error("Firebase is not configured. Add VITE_FIREBASE_* keys in .env.");
+      return;
+    }
+
+    setLoading("google");
+    try {
+      await signInWithPopup(auth, googleProvider);
+      toast.success("Google authentication successful.");
       navigate("/onboarding/biometric");
-    }, 2000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Google sign-in failed.";
+      toast.error(message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!isFirebaseConfigured || !auth) {
+      toast.error("Firebase is not configured. Add VITE_FIREBASE_* keys in .env.");
+      return;
+    }
+
+    const normalizedPhone = phoneNumber.replace(/\s+/g, "").trim();
+    if (!/^\+[1-9]\d{9,14}$/.test(normalizedPhone)) {
+      toast.error("Enter a valid phone number in E.164 format, for example +919876543210.");
+      return;
+    }
+
+    setLoading("phone");
+    try {
+      const verifier = await getOrCreateRecaptchaVerifier();
+      const result = await signInWithPhoneNumber(auth, normalizedPhone, verifier);
+      setConfirmationResult(result);
+      setOtpCode("");
+      toast.success("OTP sent. Enter the verification code.");
+    } catch (error) {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+      const message = error instanceof Error ? error.message : "Could not send OTP.";
+      toast.error(message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!confirmationResult) {
+      toast.error("Send OTP first.");
+      return;
+    }
+
+    if (!/^\d{6}$/.test(otpCode.trim())) {
+      toast.error("Enter a valid 6-digit OTP.");
+      return;
+    }
+
+    setLoading("otp");
+    try {
+      await confirmationResult.confirm(otpCode.trim());
+      toast.success("Phone number verified.");
+      navigate("/onboarding/biometric");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "OTP verification failed.";
+      toast.error(message);
+    } finally {
+      setLoading(null);
+    }
   };
 
   return (
@@ -34,7 +139,7 @@ const Login = () => {
 
         <div className="space-y-4 animate-in slide-in-from-bottom duration-700 delay-300">
           <button 
-            onClick={() => handleLogin("google")}
+            onClick={handleGoogleLogin}
             className="w-full h-14 rounded-2xl bg-white border border-border flex items-center justify-center gap-3 font-semibold hover:bg-secondary transition-base shadow-sm"
           >
             {loading === "google" ? <Loader2 className="w-5 h-5 animate-spin" /> : (
@@ -53,21 +158,87 @@ const Login = () => {
           </button>
 
           <button 
-            onClick={() => handleLogin("phone")}
+            onClick={() => setShowPhoneFlow((prev) => !prev)}
             className="w-full h-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center gap-3 font-bold shadow-glow transition-base hover:opacity-90"
           >
-            {loading === "phone" ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+            {loading === "phone" || loading === "otp" ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <>
                 <Phone className="w-5 h-5" />
-                Continue with Phone
+                {showPhoneFlow ? "Hide Phone Login" : "Continue with Phone"}
               </>
             )}
           </button>
+
+          {showPhoneFlow && (
+            <div className="rounded-2xl border border-border bg-card/60 backdrop-blur px-4 py-4 space-y-3">
+              <div className="space-y-2">
+                <label htmlFor="phone-number" className="text-xs font-semibold text-muted-foreground">
+                  Phone Number
+                </label>
+                <Input
+                  id="phone-number"
+                  type="tel"
+                  placeholder="+919876543210"
+                  value={phoneNumber}
+                  onChange={(event) => setPhoneNumber(event.target.value)}
+                  autoComplete="tel"
+                />
+              </div>
+
+              <button
+                onClick={handleSendOtp}
+                disabled={loading === "phone"}
+                className="w-full h-11 rounded-xl bg-primary/10 text-primary font-semibold border border-primary/20"
+              >
+                {loading === "phone" ? "Sending OTP..." : confirmationResult ? "Resend OTP" : "Send OTP"}
+              </button>
+
+              {confirmationResult && (
+                <>
+                  <div className="space-y-2">
+                    <label htmlFor="otp-code" className="text-xs font-semibold text-muted-foreground">
+                      OTP Code
+                    </label>
+                    <Input
+                      id="otp-code"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="Enter 6-digit code"
+                      value={otpCode}
+                      onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, ""))}
+                      autoComplete="one-time-code"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={loading === "otp"}
+                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2"
+                  >
+                    {loading === "otp" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        Verify OTP
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           <p className="text-[10px] text-center text-muted-foreground px-8 pt-4">
             By continuing, you agree to TruPay's <span className="underline">Terms</span> and <span className="underline">Privacy Policy</span>.
           </p>
         </div>
+
+        <div id="recaptcha-container" />
       </div>
     </PhoneShell>
   );
