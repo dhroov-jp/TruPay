@@ -11,8 +11,7 @@ const items = [
 
 export const BottomNav = () => {
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] z-50 px-4 pb-4 pt-2 pointer-events-none">
-      <div className="pointer-events-auto bg-card/90 backdrop-blur-xl border border-border rounded-[28px] shadow-elevated px-2 py-2 flex items-center justify-between">
+    <div className="pointer-events-auto bg-card/90 backdrop-blur-xl border border-border rounded-[28px] shadow-elevated px-2 py-2 flex items-center justify-between">{/* wrapper provided by PhoneShell */}
         {items.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
