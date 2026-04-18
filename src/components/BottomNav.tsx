@@ -34,7 +34,6 @@ export const BottomNav = () => {
             )}
           </NavLink>
         ))}
-      </div>
-    </nav>
+    </div>
   );
 };
