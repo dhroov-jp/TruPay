@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { X, User, Shield, CreditCard, Settings, LogOut, ChevronRight, Share2, BadgeCheck, Fingerprint, ScanFace } from "lucide-react";
+import { X, Shield, CreditCard, Settings, LogOut, ChevronRight, Share2, BadgeCheck, Fingerprint, ScanFace } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { signOutAndCleanup } from "@/lib/authSession";
 
 interface ProfileDrawerProps {
   isOpen: boolean;
@@ -9,9 +12,11 @@ interface ProfileDrawerProps {
 }
 
 export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
   const [showQR, setShowQR] = useState(false);
   const [showEnroll, setShowEnroll] = useState(false);
   const [isEnrolling, setIsEnrolling] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(true);
   const [bioType, setBioType] = useState<"face" | "finger">("face");
 
@@ -24,6 +29,25 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
       setBioEnabled(true);
       setTimeout(() => setShowEnroll(false), 1200);
     }, 2800);
+  };
+
+  const handleSignOut = async () => {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+    try {
+      await signOutAndCleanup();
+      onClose();
+      navigate("/", { replace: true });
+      toast.success("Signed out successfully.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to sign out.";
+      toast.error(message);
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   return (
@@ -119,9 +143,13 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({ isOpen, onClose })
 
           {/* Logout */}
           <div className="p-6 border-t border-border">
-            <button className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-destructive/5 text-destructive font-semibold hover:bg-destructive/10 transition-colors">
+            <button
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-destructive/5 text-destructive font-semibold hover:bg-destructive/10 transition-colors disabled:opacity-70"
+            >
               <LogOut className="w-5 h-5" />
-              Sign Out
+              {isSigningOut ? "Signing Out..." : "Sign Out"}
             </button>
           </div>
         </div>
