@@ -14,7 +14,7 @@ const Success = () => {
   };
 
   useEffect(() => {
-    if (!contact) navigate("/", { replace: true });
+    if (!contact) navigate("/home", { replace: true });
   }, [contact, navigate]);
 
   if (!contact || !amount) return null;
@@ -42,7 +42,7 @@ const Success = () => {
         </div>
 
         <button
-          onClick={() => navigate("/", { replace: true })}
+          onClick={() => navigate("/home", { replace: true })}
           className="mt-10 w-full max-w-xs py-4 rounded-2xl bg-gradient-primary text-primary-foreground font-display font-semibold shadow-glow"
         >
           Done

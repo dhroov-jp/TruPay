@@ -31,17 +31,21 @@ const Send = () => {
         <h1 className="font-display text-xl font-semibold">Send Money</h1>
       </header>
 
-      <div className="px-5 animate-slide-up">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <div className="px-5">
+        <div className="relative group animate-slide-up" style={{ animationDelay: "100ms" }}>
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
+            type="text"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Name, UPI ID or mobile"
-            className="w-full bg-card border border-border rounded-2xl pl-10 pr-12 py-3.5 text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-base shadow-card"
+            className="w-full h-14 pl-11 pr-14 rounded-2xl bg-white border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-base shadow-sm"
           />
-          <button className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl bg-gradient-primary text-primary-foreground flex items-center justify-center">
-            <ScanLine className="w-4 h-4" />
+          <button 
+            onClick={() => navigate("/scan")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:shadow-glow transition-base"
+          >
+            <ScanLine className="w-5 h-5" />
           </button>
         </div>
       </div>

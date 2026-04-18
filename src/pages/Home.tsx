@@ -3,15 +3,19 @@ import { Eye, EyeOff, Send, ScanLine, Clock, ShieldCheck, ArrowUpRight, ArrowDow
 import { useState } from "react";
 import { PhoneShell } from "@/components/PhoneShell";
 import { TRANSACTIONS } from "@/data/mockData";
+import { getBalance } from "@/lib/upi";
+import { ProfileDrawer } from "@/components/ProfileDrawer";
 import { cn } from "@/lib/utils";
 
 const Home = () => {
   const navigate = useNavigate();
   const [showBalance, setShowBalance] = useState(true);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const balance = getBalance();
 
   const quickActions = [
     { icon: Send, label: "Send", to: "/send", primary: true },
-    { icon: ScanLine, label: "Scan QR", to: "/send" },
+    { icon: ScanLine, label: "Scan QR", to: "/scan" },
     { icon: Clock, label: "History", to: "/history" },
     { icon: ShieldCheck, label: "Shield", to: "/shield" },
   ];
@@ -24,7 +28,10 @@ const Home = () => {
           <p className="text-xs text-muted-foreground">Good evening</p>
           <h1 className="text-lg font-display font-semibold">Arjun Patel</h1>
         </div>
-        <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-display font-semibold shadow-card">
+        <div 
+          onClick={() => setIsProfileOpen(true)}
+          className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-display font-semibold shadow-card cursor-pointer hover:scale-105 transition-transform"
+        >
           AP
         </div>
       </header>
@@ -45,8 +52,8 @@ const Home = () => {
           </div>
           <div className="relative">
             <p className="font-display text-4xl font-semibold tracking-tight">
-              {showBalance ? "₹ 1,24,580" : "₹ ••••••"}
-              <span className="text-lg text-primary-foreground/60">.45</span>
+              {showBalance ? `₹ ${balance.toLocaleString("en-IN").split(".")[0]}` : "₹ ••••••"}
+              <span className="text-lg text-primary-foreground/60">.{balance.toFixed(2).split(".")[1]}</span>
             </p>
             <p className="text-xs text-primary-foreground/70 mt-2">HDFC •••• 4421 · UPI Linked</p>
           </div>
@@ -147,6 +154,8 @@ const Home = () => {
           })}
         </div>
       </section>
+
+      <ProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </PhoneShell>
   );
 };
