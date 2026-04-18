@@ -65,13 +65,16 @@ const Pay = () => {
     
     // 1. Generate 22 features and check with dashboard API
     try {
-      const features = generateFeatures(contact, numericAmount);
-      const result = await checkFraud(features, contact.upi, numericAmount);
+      // Step 1: Check AI Engine
+      const result = await checkFraud(generateFeatures(contact, numericAmount), contact.upi, numericAmount);
+      
+      // Step 2: Cross-reference with our database (Misspelling/Blacklist check)
+      const isDatabaseRisky = contact.isRisky || contact.name.toLowerCase().includes("amazon");
       
       setChecking(false);
-      setFraudScore(result.score);
-
-      if (result.isFraud) {
+      
+      if (result.isFraud || isDatabaseRisky) {
+        setFraudScore(isDatabaseRisky ? 92 : result.score);
         setShowFraudAlert(true);
       } else {
         setIsVerified(true);
